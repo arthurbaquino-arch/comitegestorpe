@@ -74,6 +74,10 @@ st.markdown("---")
 # Processamento Condicional - AGORA LENDO DIRETAMENTE DO DISCO
 # ----------------------------------------------------
 
+# Define a coluna esperada para Parcela Anual
+COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
+
+
 # Verifica se o arquivo existe antes de tentar ler
 if not os.path.exists(FILE_PATH):
     st.error(f"❌ Erro: O arquivo de dados '{FILE_PATH}' não foi encontrado.")
@@ -87,16 +91,28 @@ else:
             # --- CORREÇÃO CRÍTICA: Remove espaços em branco do início/fim dos nomes das colunas ---
             df.columns = df.columns.str.strip()
             
+            # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
+            colunas_criticas = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES"]
+            
+            if not all(col in df.columns for col in colunas_criticas):
+                 # Se alguma coluna crítica não existir, exibe o erro e a lista de colunas.
+                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique a ortografia exata dos cabeçalhos.")
+                 st.info(f"Colunas disponíveis no arquivo (após limpeza de espaços): {', '.join(df.columns.tolist())}")
+                 st.stop()
+            
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1].copy()
             
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             
             colunas_para_float = [
-                "ENDIVIDAMENTO TOTAL", "PARCELA ANUAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
+                "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
+            
+            # Remove duplicatas (apenas por segurança)
+            colunas_para_float = list(set(colunas_para_float)) 
 
             df_float = df.copy()
             
@@ -108,21 +124,12 @@ else:
 
                     # Lógica de conversão BR para Float 
                     try:
-                        # Tenta usar regex=False (melhor para compatibilidade em algumas versões)
                         str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                     except TypeError:
-                        # Fallback se regex=False não for suportado
                         str_limpa = str_series.str.replace('.', 'TEMP').str.replace(',', '.').str.replace('TEMP', '')
                     
                     df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
-
-            # Verificação crítica de colunas. Se "PARCELA ANUAL" ainda não existir, o erro será exibido.
-            colunas_criticas = ["ENTE", "STATUS", "PARCELA ANUAL", "APORTES"]
-            if not all(col in df_float.columns for col in colunas_criticas):
-                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
-                 # Se o erro persistir, verifique a ortografia exata da coluna 'PARCELA ANUAL' no seu CSV.
-                 st.stop()
                  
             df["ENTE"] = df["ENTE"].astype(str)
             df["STATUS"] = df["STATUS"].astype(str)
@@ -158,8 +165,8 @@ else:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # USANDO O DF DE CÁLCULO (DF_FLOAT_FILTRADO) PARA SOMAS CORRETAS
-                total_parcela_anual = df_filtrado_calculo["PARCELA ANUAL"].sum()
+                # USANDO A COLUNA CORRETA (PARCELA ANUAL)
+                total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
                 num_entes = df_filtrado_calculo["ENTE"].nunique()
@@ -169,7 +176,8 @@ else:
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
                 with col_parcela_anual:
-                    st.metric(label="Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
+                    # Rótulo usa o nome da coluna para refletir o que está sendo usado
+                    st.metric(label=f"Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
                     st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
                 with col_saldo:
@@ -211,13 +219,13 @@ else:
                 
                 with tab1:
                     st.subheader("RCL e Percentuais por Tribunal")
-                    # ADICIONANDO PARCELA ANUAL À TABELA DE DETALHE
-                    colunas_indices = ["ENTE", "RCL 2024", "PARCELA ANUAL", "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+                    # USANDO A COLUNA CORRETA (PARCELA ANUAL) NA TABELA DE DETALHE
+                    colunas_indices = ["ENTE", "RCL 2024", COLUNA_PARCELA_ANUAL, "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
                     
                     df_indices = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                     df_indices_styled = df_indices[[col for col in colunas_indices if col in df_indices.columns]].copy()
                     
-                    for col in ["RCL 2024", "PARCELA ANUAL"]:
+                    for col in ["RCL 2024", COLUNA_PARCELA_ANUAL]:
                         if col in df_indices_styled.columns:
                             df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                     
