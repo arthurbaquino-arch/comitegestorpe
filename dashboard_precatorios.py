@@ -10,27 +10,22 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# FUNÇÃO DE FORMATAÇÃO EXPLICITA BRASILEIRA (R$ 1.234.567,89)
+# FUNÇÃO DE FORMATAÇÃO EXPLÍCITA BRASILEIRA (R$ 1.234.567,89)
 # ----------------------------------------------------
 def formatar_br(valor, formato):
-    """
-    Formata um valor para o padrão monetário/percentual brasileiro.
-    Se o formato for 'PERCENTUAL_TEXTO', apenas adiciona o % na string.
-    """
+    """Formata um float ou int para o padrão monetário/percentual brasileiro."""
     try:
         if pd.isna(valor) or valor is None:
             return "-"
         
-        # CASO ESPECIAL: Apenas anexa o % ao valor lido como string
-        if formato == 'PERCENTUAL_TEXTO':
-            # Garante que o valor é uma string e remove qualquer % que possa ter sobrado.
-            str_valor = str(valor).strip().replace('%', '') 
-            return f"{str_valor}%"
-        
         # Inverte a formatação americana para simular o padrão brasileiro (milhar = ., decimal = ,).
         if formato == 'moeda':
+            # Formata o float (ex: 1234567.89) para R$ 1.234.567,89
             return f"R$ {valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
-        else: # Formato genérico com 2 casas (usado para percentuais numéricos que funcionaram, se houver)
+        elif formato == 'percentual':
+            # Formata o float (ex: 0.41 ou 95) para 0,41% ou 95,00%
+            return f"{valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+        else: # Formato genérico com 2 casas
             return f"{valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
     except Exception:
         return "-"
@@ -59,35 +54,47 @@ if uploaded_file is not None:
     
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # Lista de colunas que NÃO DEVEM SER CONVERTIDAS (APENAS LIDOS OS VALORES BRUTOS)
-            colunas_texto_percentual = ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
-            
-            # Lê o CSV, forçando as colunas de percentual a serem lidas como STRING
-            df = pd.read_csv(uploaded_file, 
-                             delimiter=";", 
-                             dtype={col: str for col in colunas_texto_percentual})
+            # Lendo o CSV
+            df = pd.read_csv(uploaded_file, delimiter=";")
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
-            df = df.iloc[:-1]
+            df = df.iloc[:-1].copy() # Usar .copy() para evitar SettingWithCopyWarning
             
-            # --- Limpeza e Conversão de Colunas Numéricas (Apenas para moeda e aportes) ---
-            colunas_numericas_float = [
+            # --- 1. COLUNAS MONETÁRIAS (RCL, Endividamento, Aportes) ---
+            colunas_moeda = [
                 "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "SALDO A PAGAR", 
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
             
-            for col in colunas_numericas_float:
+            for col in colunas_moeda:
                 if col in df.columns:
-                    # 1. Limpeza: remove R$, (), %
-                    df[col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
+                    # 1. Limpeza: remove R$, (), % e espaços
+                    df.loc[:, col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
                     
-                    # 2. ESSENCIAL: Troca PONTO por VÍRGULA e VÍRGULA por PONTO (Padrão BR -> Padrão Float)
-                    df[col] = df[col].str.replace('.', 'TEMP', regex=False) # Protege o ponto milhar
-                    df[col] = df[col].str.replace(',', '.', regex=False)    # Transforma vírgula decimal em ponto decimal
-                    df[col] = df[col].str.replace('TEMP', '', regex=False)  # Remove o separador de milhar
-
+                    # 2. Conversão de formato BR para Float: 
+                    # Transforma R$ 1.234.567,89 (lido como string) em 1234567.89 (float)
+                    df.loc[:, col] = df[col].str.replace('.', 'TEMP', regex=False) # Protege o ponto milhar
+                    df.loc[:, col] = df[col].str.replace(',', '.', regex=False)    # Transforma vírgula decimal em ponto decimal
+                    df.loc[:, col] = df[col].str.replace('TEMP', '', regex=False)  # REMOVE o separador de milhar
+                    
                     # 3. Conversão para float
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    df.loc[:, col] = pd.to_numeric(df[col], errors='coerce')
+
+            # --- 2. COLUNAS PERCENTUAIS (DÍVIDA/RCL e Rateios) ---
+            colunas_percentual = ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+            
+            for col in colunas_percentual:
+                 if col in df.columns:
+                    # 1. Limpeza: remove R$, (), % e espaços
+                    df.loc[:, col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
+                    
+                    # 2. Conversão de formato BR para Float: 
+                    # Transforma "0,41" (string) em 0.41 (float)
+                    # Não há separador de milhar para remover
+                    df.loc[:, col] = df[col].str.replace(',', '.', regex=False)    
+                    
+                    # 3. Conversão para float
+                    df.loc[:, col] = pd.to_numeric(df[col], errors='coerce')
 
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
             if not all(col in df.columns for col in colunas_criticas):
@@ -158,9 +165,8 @@ if uploaded_file is not None:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
                         
-                # APLICA O FORMATO PERCENTUAL_TEXTO (apenas adiciona o %)
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
-                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'PERCENTUAL_TEXTO'))
+                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'percentual'))
 
                 st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
                 
@@ -181,10 +187,9 @@ if uploaded_file is not None:
                     if "RCL 2024" in df_indices_styled.columns:
                         df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: formatar_br(x, 'moeda'))
                     
-                    # Todas as colunas de percentual são tratadas como texto
                     for col in ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]:
                         if col in df_indices_styled.columns:
-                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: formatar_br(x, 'PERCENTUAL_TEXTO'))
+                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: formatar_br(x, 'percentual'))
                         
                     st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
 
