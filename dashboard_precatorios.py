@@ -13,16 +13,26 @@ st.set_page_config(
 # FUNÇÃO DE FORMATAÇÃO EXPLICITA BRASILEIRA (R$ 1.234.567,89)
 # ----------------------------------------------------
 def formatar_br(valor, formato):
-    """Formata um float ou int para o padrão monetário/percentual brasileiro (ponto milhar, vírgula decimal)."""
+    """
+    Formata um valor (float) para o padrão monetário/percentual brasileiro.
+    Se o formato for 'DÍVIDA_TEXTO', apenas adiciona o % na string.
+    """
     try:
         if pd.isna(valor) or valor is None:
             return "-"
+        
+        # Caso especial para a coluna problemática (tratada como string)
+        if formato == 'DÍVIDA_TEXTO':
+            # Remove % se houver e adiciona de volta
+            str_valor = str(valor).strip().replace('%', '')
+            # Mantém a vírgula/ponto do original, apenas adiciona o %
+            return f"{str_valor}%"
         
         # Inverte a formatação americana para simular o padrão brasileiro (milhar = ., decimal = ,).
         if formato == 'moeda':
             return f"R$ {valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         elif formato == 'percentual':
-            # Mantém: Assume que o valor recebido (ex: 0.41 ou 95) é o valor numérico a ser formatado com %.
+            # Formata o número (ex: 95.0) para 95,00%
             return f"{valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         else: # Formato genérico com 2 casas
             return f"{valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
@@ -53,29 +63,34 @@ if uploaded_file is not None:
     
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            df = pd.read_csv(uploaded_file, delimiter=";")
+            # Lista de colunas que devem ser lidas como STRING
+            colunas_string = ["DÍVIDA EM MORA / RCL"]
+            
+            # Lê o CSV com a instrução para ler a coluna problemática como string
+            df = pd.read_csv(uploaded_file, delimiter=";", dtype={col: str for col in colunas_string})
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1]
             
-            # --- Limpeza e Conversão de Colunas Numéricas (Otimizada) ---
-            colunas_numericas = [
-                "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
-                "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
+            # --- Limpeza e Conversão de Colunas Numéricas ---
+            # Remove a coluna DÍVIDA EM MORA / RCL da lista de colunas a serem convertidas
+            colunas_numericas_float = [
+                "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "SALDO A PAGAR", 
+                "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
             
-            # Colunas que podem vir com o ponto decimal (padrão Americano) ou vírgula (padrão Brasileiro)
-            for col in colunas_numericas:
+            for col in colunas_numericas_float:
                 if col in df.columns:
-                    # 1. Limpeza padrão: remove R$, (), %
+                    # 1. Limpeza: remove R$, (), %
                     df[col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
                     
-                    # 2. CORREÇÃO PRINCIPAL: Troca a VÍRGULA por PONTO antes de converter, para que o pandas leia o decimal.
-                    # Se o seu CSV usa vírgula como decimal (padrão BR), essa linha é essencial.
-                    df[col] = df[col].str.replace(',', '.', regex=False)
-                    
-                    # 3. Conversão para float (coerce = vira NaN se falhar)
+                    # 2. ESSENCIAL: Troca PONTO por VÍRGULA e VÍRGULA por PONTO (Padrão BR -> Padrão Float)
+                    df[col] = df[col].str.replace('.', 'TEMP', regex=False) # Protege o ponto milhar
+                    df[col] = df[col].str.replace(',', '.', regex=False)    # Transforma vírgula decimal em ponto decimal
+                    df[col] = df[col].str.replace('TEMP', '', regex=False)  # Remove o separador de milhar
+
+                    # 3. Conversão para float
                     df[col] = pd.to_numeric(df[col], errors='coerce')
 
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
@@ -114,6 +129,7 @@ if uploaded_file is not None:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
+                # Para o cálculo de KPI, a DÍVIDA EM MORA / RCL não é somada, então não precisamos nos preocupar.
                 total_divida = df_filtrado["ENDIVIDAMENTO TOTAL"].sum()
                 total_aportes = df_filtrado["APORTES"].sum()
                 saldo_a_pagar = df_filtrado["SALDO A PAGAR"].sum()
@@ -147,8 +163,9 @@ if uploaded_file is not None:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
                         
+                # APLICA O FORMATO DÍVIDA_TEXTO para apenas anexar o %
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
-                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'percentual'))
+                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'DÍVIDA_TEXTO'))
 
                 st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
                 
@@ -168,7 +185,13 @@ if uploaded_file is not None:
                     
                     if "RCL 2024" in df_indices_styled.columns:
                         df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: formatar_br(x, 'moeda'))
-                    for col in ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]:
+                    
+                    # DÍVIDA EM MORA / RCL é tratada como texto
+                    if "DÍVIDA EM MORA / RCL" in df_indices_styled.columns:
+                        df_indices_styled["DÍVIDA EM MORA / RCL"] = df_indices_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'DÍVIDA_TEXTO'))
+                        
+                    # Os outros percentuais continuam como números (float)
+                    for col in ["% TJPE", "% TRF5", "% TRT6"]:
                         if col in df_indices_styled.columns:
                             df_indices_styled[col] = df_indices_styled[col].apply(lambda x: formatar_br(x, 'percentual'))
                         
