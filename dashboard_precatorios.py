@@ -16,7 +16,7 @@ COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES", "DÍVIDA 
 
 # --- Configuração da página ---
 st.set_page_config(
-    page_title="💰 Painel de Precatórios: Foco e Detalhe",
+    page_title="💰 Situação dos Entes Devedores",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -31,8 +31,6 @@ def read_csv_robustly(file_path):
     for encoding in encodings:
         try:
             # Tentar ler com o encoding atual. 
-            # Não usaremos decimal/thousands aqui, pois o símbolo '%' no dado original 
-            # confunde o Pandas. Faremos a conversão manual no loop abaixo.
             df = pd.read_csv(file_path, sep=";", encoding=encoding, header=0, na_values=['#N/D', '#VALOR!', '-'])
             
             # Limpeza e Renomeação Agressiva dos cabeçalhos
@@ -49,8 +47,9 @@ def read_csv_robustly(file_path):
                 # 2. Corrige a codificação conhecida (DÃVIDA -> DÍVIDA)
                 if 'DÃVIDA EM MORA / RCL' in stripped_col:
                     stripped_col = 'DÍVIDA EM MORA / RCL'
-
-                col_map[col] = stripped_col
+                
+                # 3. Garante que os nomes finais não tenham espaços desnecessários
+                col_map[col] = stripped_col.strip()
             
             df.rename(columns=col_map, inplace=True)
             return df
@@ -60,11 +59,11 @@ def read_csv_robustly(file_path):
             continue
     
     # Se todas as tentativas falharem
-    raise Exception("Erro de Codificação Incurável.")
+    raise Exception("Erro de Codificação Incurável na leitura do CSV.")
 
 
 # ----------------------------------------------------
-# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (CORRIGIDA)
+# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Mantida e Corrigida para %)
 # ----------------------------------------------------
 def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
@@ -81,27 +80,20 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     else:
         # Lógica de conversão de strings (se o Pandas não conseguiu na leitura)
         str_valor = str(valor).strip()
-        
-        # Remove símbolos de moeda, parênteses e %
         str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
 
         try:
             # Converte formato BR (ponto milhar, vírgula decimal) para Float (ponto decimal)
-            # Regex=False para compatibilidade
             str_float = str_limpa.replace('.', 'TEMP', regex=False).replace(',', '.', regex=False).replace('TEMP', '', regex=False)
             num_valor = float(str_float)
         except Exception:
             return "-" # Retorna '-' se não for conversível
             
-    # CRITICAL FIX: Remover esta verificação permite exibir 0.00%
-    # if abs(num_valor) < 0.01 and formato != 'percentual': 
-    #      return "-"
-         
     try:
         # Formatação final para exibição
         if formato == 'moeda':
             # Verifica se é zero, e se for, retorna "-" (regra de negócio para moeda)
-            if num_valor == 0:
+            if num_valor == 0 or abs(num_valor) < 0.01:
                 return "-"
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
@@ -117,10 +109,14 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 
 
 # ----------------------------------------------------
-# TÍTULOS E LAYOUT INICIAL
+# TÍTULOS E LAYOUT INICIAL (ALTERADO)
 # ----------------------------------------------------
-st.markdown("<h1 style='color: #00BFFF;'>💰 Visão Geral Financeira de Precatórios</h1>", unsafe_allow_html=True)
-st.caption("Organização Foco e Detalhe por Ente Devedor")
+st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
+
+# Novo Subtítulo em negrito e com os comitês abaixo
+st.markdown("<h3>Comitê Gestor</h3>", unsafe_allow_html=True)
+st.markdown("TJPE - TRF5 - TRT6")
+
 st.markdown("---") 
 
 # ----------------------------------------------------
@@ -145,16 +141,14 @@ else:
                  st.stop()
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
-            # Assume que a última linha é uma totalização
             df = df.iloc[:-1].copy()
             
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             df_float = df.copy() 
             
-            # Garante que as colunas críticas de cálculo sejam numéricas
             colunas_para_float_final = [
                 "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", 
-                "DÍVIDA EM MORA / RCL", "% APLICADO", # Adicionado % APLICADO aqui
+                "DÍVIDA EM MORA / RCL", "% APLICADO", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
@@ -163,10 +157,8 @@ else:
 
             # Aplica conversão forçada de string para float para todas as colunas numéricas
             for col in colunas_para_float_final:
-                 # Usa a mesma lógica de limpeza da função converter_e_formatar, mas em massa
+                 # Usa a mesma lógica de limpeza da função converter_e_formatar
                  str_series = df_float[col].astype(str).str.strip().str.replace('R$', '', regex=False).str.replace('(', '', regex=False).str.replace(')', '', regex=False).str.replace('%', '', regex=False).str.strip()
-                 
-                 # Converte formato BR (ponto milhar, vírgula decimal) para Float (ponto decimal)
                  str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                  
                  df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
@@ -191,7 +183,6 @@ else:
             filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
             
-            # Filtra o dataframe float (para cálculos e exibição de dados formatados)
             df_filtrado_calculo = df_float[filtro_status & filtro_entes]
             
             # ----------------------------------------------------
@@ -205,7 +196,6 @@ else:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # Calcula os totais do dataframe FLOAT
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
@@ -233,18 +223,15 @@ else:
                 ]
                 
                 if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
-                    # Ordena pelo DF de cálculo (float)
                     df_exibicao_final = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
                 
-                # Cria a tabela de exibição final, puxando os floats e formatando
                 df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
                 
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
-                        # Aplica a formatação em cada linha
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                         
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
@@ -261,7 +248,6 @@ else:
                 
                 with tab1:
                     st.subheader("RCL e Percentuais por Tribunal")
-                    # Incluído o % APLICADO aqui
                     colunas_indices = ["ENTE", "RCL 2024", COLUNA_PARCELA_ANUAL, "DÍVIDA EM MORA / RCL", "% APLICADO", "% TJPE", "% TRF5", "% TRT6"]
                     
                     df_indices_styled = df_exibicao_final[[col for col in colunas_indices if col in df_exibicao_final.columns]].copy()
@@ -290,4 +276,4 @@ else:
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
-            st.warning("O problema de leitura persiste. Por favor, verifique se seu arquivo CSV: 1. Usa o ponto e vírgula (`;`) como separador. 2. A última linha de Totalização foi removida. 3. Não possui quebras de linha no meio de células de texto.")
+            st.warning("Verifique se o seu CSV possui problemas de formatação que impedem a leitura robusta, como quebras de linha ou caracteres ilegais.")
