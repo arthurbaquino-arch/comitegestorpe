@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 1. Widget de Upload (na Sidebar)
+# 1. Widget de Upload (na Sidebar, para liberar o espaço principal)
 # ----------------------------------------------------
 with st.sidebar:
     st.header("Upload de Dados")
@@ -21,13 +21,14 @@ with st.sidebar:
     )
 
 st.title("Painel de Controle: Precatórios por Ente Devedor")
+st.caption("Foco em Métricas e Indicadores Chave (KPIs)")
 st.markdown("---") # Linha separadora elegante
 
 # ----------------------------------------------------
 # Processamento Condicional
 # ----------------------------------------------------
 if uploaded_file is not None:
-    # Adicionar um 'spinner' para dar feedback profissional
+    
     with st.spinner('Carregando e processando os indicadores...'):
         try:
             # 2. Leitura do arquivo (usando o separador ;)
@@ -46,11 +47,12 @@ if uploaded_file is not None:
                     df[col] = (
                         df[col]
                         .astype(str)
-                        .str.replace(r'[R$\(\)]', '', regex=True)
-                        .str.replace('.', '', regex=False)
-                        .str.replace(',', '.', regex=False)
+                        .str.replace(r'[R$\(\)]', '', regex=True) # Remove R$, (, e )
+                        .str.replace('.', '', regex=False) # Remove pontos (separador de milhares)
+                        .str.replace(',', '.', regex=False) # Troca vírgula por ponto (separador decimal)
                         .str.strip()
                     )
+                    # errors='coerce' transforma falhas de conversão em NaN, evitando erros fatais
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                     
             # 3. Verificação de Colunas Críticas
@@ -67,12 +69,13 @@ if uploaded_file is not None:
                 st.markdown("---")
                 st.header("Filtros Analíticos")
                 
-                # Remoção do 'nan' para filtros limpos
+                # CORREÇÃO: Remoção de 'nan' dos filtros de Status
                 status_lista_limpa = df["STATUS"].dropna().unique().tolist()
                 status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
+                
                 entes_lista = df["ENTE"].unique().tolist()
                 
-                # Filtro Selectbox Ente Devedor
+                # Filtro Selectbox Ente Devedor (lista suspensa)
                 selected_ente = st.selectbox(
                     "Ente Devedor:", 
                     options=["Todos"] + sorted(entes_lista) 
@@ -91,7 +94,7 @@ if uploaded_file is not None:
             df_filtrado = df[filtro_status & filtro_entes]
             
             # ----------------------------------------------------
-            # Novo Layout: Foco em Painel e KPIs (Dark Mode)
+            # Layout Painel (Modo Escuro Implícito e Foco em Tabela/Métrica)
             # ----------------------------------------------------
             
             if df_filtrado.empty:
@@ -113,7 +116,6 @@ if uploaded_file is not None:
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
                 with col_divida:
-                    # Usando delta para mostrar a diferença (pode ser ajustado para mostrar a dívida anterior, se disponível)
                     st.metric(label="Endividamento Total (R$)", value=f"R$ {total_divida:,.2f}")
                 with col_aportes:
                     st.metric(label="Total de Aportes (R$)", value=f"R$ {total_aportes:,.2f}")
@@ -122,20 +124,21 @@ if uploaded_file is not None:
                 
                 st.markdown("---") 
 
-                # --- Seção 2: Tabela de Status e Dívida por Ente ---
-                st.header("Resumo da Situação por Ente")
+                # --- Seção 2: Tabela de Resumo (Foco Principal do Painel) ---
+                st.header("Resumo da Situação por Ente (Tabela Principal)")
                 
-                # Tabela Consolidada (Mais limpa e com formatação de números)
-                df_resumo = df_filtrado[[
+                colunas_resumo = [
                     "ENTE", 
                     "STATUS", 
                     "ENDIVIDAMENTO TOTAL", 
                     "APORTES", 
                     "SALDO A PAGAR",
                     "DÍVIDA EM MORA / RCL"
-                ]].sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False).fillna('-')
+                ]
+                
+                df_resumo = df_filtrado[[col for col in colunas_resumo if col in df_filtrado.columns]].sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False).fillna('-')
 
-                # Formatação de Moeda na Tabela
+                # Formatação de Moeda na Tabela (para um visual profissional)
                 df_resumo_styled = df_resumo.style.format({
                     "ENDIVIDAMENTO TOTAL": "R$ {:,.2f}",
                     "APORTES": "R$ {:,.2f}",
@@ -147,22 +150,23 @@ if uploaded_file is not None:
                 
                 st.markdown("---")
 
-                # --- Seção 3: Detalhes dos Índices e Aportes (em abas) ---
-                st.header("Análise Detalhada de Índices e Aportes")
+                # --- Seção 3: Detalhes dos Índices e Aportes (em abas para organizar o layout) ---
+                st.header("Análise Detalhada (Índices e Tribunais)")
                 
-                tab1, tab2 = st.tabs(["📊 Índices e RCL", "🏛️ Aportes por Tribunal"])
+                tab1, tab2 = st.tabs(["📊 Detalhes de Índices (RCL)", "🏛️ Detalhes de Aportes por Tribunal"])
                 
                 with tab1:
                     st.subheader("Índices e Responsabilidade Fiscal")
-                    df_indices = df_filtrado[[
-                        "ENTE", 
-                        "RCL 2024", 
-                        "DÍVIDA EM MORA / RCL"
-                    ]].sort_values(by="DÍVIDA EM MORA / RCL", ascending=False).fillna('-')
+                    colunas_indices = ["ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+                    
+                    df_indices = df_filtrado[[col for col in colunas_indices if col in df_filtrado.columns]].sort_values(by="DÍVIDA EM MORA / RCL", ascending=False).fillna('-')
                     
                     df_indices_styled = df_indices.style.format({
                         "RCL 2024": "R$ {:,.2f}",
-                        "DÍVIDA EM MORA / RCL": "{:.2f}%"
+                        "DÍVIDA EM MORA / RCL": "{:.2f}%",
+                        "% TJPE": "{:.2f}%",
+                        "% TRF5": "{:.2f}%",
+                        "% TRT6": "{:.2f}%"
                     })
                     st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
 
@@ -180,7 +184,8 @@ if uploaded_file is not None:
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
-            st.error(f"Ocorreu um erro inesperado. Detalhes: {e}")
+            # Mensagem genérica para erros inesperados
+            st.error(f"Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto. Detalhes: {e}")
 
 else:
     # Mensagem quando o arquivo não está carregado
