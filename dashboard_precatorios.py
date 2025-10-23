@@ -10,26 +10,37 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# FUNÇÃO DE FORMATAÇÃO EXPLÍCITA BRASILEIRA (R$ 1.234.567,89)
+# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Mais Simples)
 # ----------------------------------------------------
-def formatar_br(valor, formato):
-    """Formata um float ou int para o padrão monetário/percentual brasileiro."""
-    try:
-        if pd.isna(valor) or valor is None:
-            return "-"
-        
-        # Inverte a formatação americana para simular o padrão brasileiro (milhar = ., decimal = ,).
-        if formato == 'moeda':
-            # Formata o float (ex: 1234567.89) para R$ 1.234.567,89
-            return f"R$ {valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
-        elif formato == 'percentual':
-            # Formata o float (ex: 0.41 ou 95) para 0,41% ou 95,00%
-            return f"{valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
-        else: # Formato genérico com 2 casas
-            return f"{valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
-    except Exception:
+def converter_e_formatar(valor, formato):
+    """
+    Tenta converter uma string (formato BR) para float e a formata.
+    Se falhar, retorna o valor original (string) ou '-'.
+    """
+    if pd.isna(valor) or valor is None or valor == "":
         return "-"
+    
+    str_valor = str(valor).strip().replace(r'[R$\(\)%,]', '', regex=True)
+    
+    # 1. Tentar converter para float (Assumindo formato BR: vírgula decimal)
+    try:
+        # 1.1 Limpeza e conversão de formato BR para float: 
+        # R$ 1.234.567,89 -> "1.234.567,89" -> "1234567.89" -> 1234567.89
+        str_limpa = str_valor.replace('.', 'TEMP').replace(',', '.').replace('TEMP', '')
+        num_valor = float(str_limpa)
 
+        # 2. Formatação
+        if formato == 'moeda':
+            return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+        elif formato == 'percentual':
+            # Assume que o valor lido (0.41 ou 95) é o valor numérico a ser exibido.
+            return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+        else:
+            return str(num_valor)
+            
+    except Exception:
+        # Se a conversão falhar (ex: célula vazia ou com erro), retorna o valor original
+        return str_valor
 
 # ----------------------------------------------------
 # 1. Widget de Upload (na Sidebar)
@@ -54,50 +65,34 @@ if uploaded_file is not None:
     
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # Lendo o CSV
+            # Lendo o CSV SEM FORÇAR NENHUM TIPO, DEIXANDO COMO STRING
             df = pd.read_csv(uploaded_file, delimiter=";")
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
-            df = df.iloc[:-1].copy() # Usar .copy() para evitar SettingWithCopyWarning
+            df = df.iloc[:-1].copy()
             
-            # --- 1. COLUNAS MONETÁRIAS (RCL, Endividamento, Aportes) ---
-            colunas_moeda = [
-                "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "SALDO A PAGAR", 
+            # --- Conversão para DataFrame de TRABALHO (apenas para filtros e gráficos) ---
+            
+            # Colunas que precisam ser FLOAT para somas/filtros/gráficos
+            colunas_para_float = [
+                "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
+                "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
-            
-            for col in colunas_moeda:
-                if col in df.columns:
-                    # 1. Limpeza: remove R$, (), % e espaços
-                    df.loc[:, col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
-                    
-                    # 2. Conversão de formato BR para Float: 
-                    # Transforma R$ 1.234.567,89 (lido como string) em 1234567.89 (float)
-                    df.loc[:, col] = df[col].str.replace('.', 'TEMP', regex=False) # Protege o ponto milhar
-                    df.loc[:, col] = df[col].str.replace(',', '.', regex=False)    # Transforma vírgula decimal em ponto decimal
-                    df.loc[:, col] = df[col].str.replace('TEMP', '', regex=False)  # REMOVE o separador de milhar
-                    
-                    # 3. Conversão para float
-                    df.loc[:, col] = pd.to_numeric(df[col], errors='coerce')
 
-            # --- 2. COLUNAS PERCENTUAIS (DÍVIDA/RCL e Rateios) ---
-            colunas_percentual = ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+            # Cria um DataFrame de trabalho temporário (df_float) para cálculos
+            df_float = df.copy()
             
-            for col in colunas_percentual:
-                 if col in df.columns:
-                    # 1. Limpeza: remove R$, (), % e espaços
-                    df.loc[:, col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
-                    
-                    # 2. Conversão de formato BR para Float: 
-                    # Transforma "0,41" (string) em 0.41 (float)
-                    # Não há separador de milhar para remover
-                    df.loc[:, col] = df[col].str.replace(',', '.', regex=False)    
-                    
-                    # 3. Conversão para float
-                    df.loc[:, col] = pd.to_numeric(df[col], errors='coerce')
+            # Aplica a limpeza e conversão de formato BR para float em todas as colunas numéricas
+            for col in colunas_para_float:
+                if col in df_float.columns:
+                    str_series = df_float[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
+                    str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
+                    df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
+
 
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
-            if not all(col in df.columns for col in colunas_criticas):
+            if not all(col in df_float.columns for col in colunas_criticas):
                  st.error(f"Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
                  st.stop()
                  
@@ -116,37 +111,42 @@ if uploaded_file is not None:
                 selected_ente = st.selectbox("👤 Ente Devedor:", options=["Todos"] + sorted(entes_lista))
                 selected_status = st.selectbox("🚦 Status da Dívida:", options=["Todos"] + sorted(status_lista))
             
-            # 4. Aplicação dos filtros
+            # 4. Aplicação dos filtros no DataFrame original e no de cálculo
             filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
-            df_filtrado = df[filtro_status & filtro_entes]
+            
+            # Filtrado para exibição (DF_FILTRADO)
+            df_filtrado_exibicao = df[filtro_status & filtro_entes]
+            # Filtrado para cálculos (DF_FLOAT_FILTRADO)
+            df_filtrado_calculo = df_float[filtro_status & filtro_entes]
             
             # ----------------------------------------------------
             # INÍCIO DO LAYOUT 1: FOCO E DETALHE
             # ----------------------------------------------------
             
-            if df_filtrado.empty:
+            if df_filtrado_exibicao.empty:
                 st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros na barra lateral.")
             else:
                 
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                total_divida = df_filtrado["ENDIVIDAMENTO TOTAL"].sum()
-                total_aportes = df_filtrado["APORTES"].sum()
-                saldo_a_pagar = df_filtrado["SALDO A PAGAR"].sum()
-                num_entes = df_filtrado["ENTE"].nunique()
+                # USANDO O DF DE CÁLCULO (DF_FLOAT_FILTRADO)
+                total_divida = df_filtrado_calculo["ENDIVIDAMENTO TOTAL"].sum()
+                total_aportes = df_filtrado_calculo["APORTES"].sum()
+                saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
+                num_entes = df_filtrado_calculo["ENTE"].nunique()
 
                 col_entes, col_divida, col_aportes, col_saldo = st.columns(4)
                 
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
                 with col_divida:
-                    st.metric(label="Endividamento Total (R$)", value=formatar_br(total_divida, 'moeda'))
+                    st.metric(label="Endividamento Total (R$)", value=converter_e_formatar(total_divida, 'moeda'))
                 with col_aportes:
-                    st.metric(label="Total de Aportes (R$)", value=formatar_br(total_aportes, 'moeda'))
+                    st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
                 with col_saldo:
-                    st.metric(label="Saldo Remanescente a Pagar (R$)", value=formatar_br(saldo_a_pagar, 'moeda'))
+                    st.metric(label="Saldo Remanescente a Pagar (R$)", value=converter_e_formatar(saldo_a_pagar, 'moeda'))
                 
                 st.markdown("---") 
 
@@ -158,15 +158,19 @@ if uploaded_file is not None:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                df_resumo = df_filtrado[[col for col in colunas_resumo if col in df_filtrado.columns]].sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
-                df_resumo_styled = df_resumo.copy()
+                # ORDENAÇÃO USANDO O DF DE CÁLCULO
+                df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
+                # SELECIONA AS LINHAS ORDENADAS NO DF DE EXIBIÇÃO
+                df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
+                df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
                 
+                # APLICA FORMATO (converter_e_formatar AGORA ACEITA STRING OU FLOAT)
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
-                        df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
+                        df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                         
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
-                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'percentual'))
+                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: converter_e_formatar(x, 'percentual'))
 
                 st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
                 
@@ -181,15 +185,15 @@ if uploaded_file is not None:
                     st.subheader("RCL e Percentuais por Tribunal")
                     colunas_indices = ["ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
                     
-                    df_indices = df_filtrado[[col for col in colunas_indices if col in df_filtrado.columns]].sort_values(by="DÍVIDA EM MORA / RCL", ascending=False)
-                    df_indices_styled = df_indices.copy()
+                    df_indices = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
+                    df_indices_styled = df_indices[[col for col in colunas_indices if col in df_indices.columns]].copy()
                     
                     if "RCL 2024" in df_indices_styled.columns:
-                        df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: formatar_br(x, 'moeda'))
+                        df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: converter_e_formatar(x, 'moeda'))
                     
                     for col in ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]:
                         if col in df_indices_styled.columns:
-                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: formatar_br(x, 'percentual'))
+                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
                         
                     st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
 
@@ -197,12 +201,12 @@ if uploaded_file is not None:
                     st.subheader("Valores Aportados por Tribunal")
                     colunas_aportes = ["ENTE", "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]
                     
-                    df_aportes = df_filtrado[[col for col in colunas_aportes if col in df_filtrado.columns]]
-                    df_aportes_styled = df_aportes.copy()
+                    df_aportes = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
+                    df_aportes_styled = df_aportes[[col for col in colunas_aportes if col in df_aportes.columns]].copy()
                     
                     for col in ["APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]:
                         if col in df_aportes_styled.columns:
-                             df_aportes_styled[col] = df_aportes_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
+                             df_aportes_styled[col] = df_aportes_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
 
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
