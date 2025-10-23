@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- Configuração da página ---
+# --- Configuração da página (Modo Escuro será aplicado se o tema do usuário for "Dark") ---
 st.set_page_config(
     page_title="Dashboard de Precatórios - EC 136/2025",
     layout="wide",
@@ -33,31 +33,29 @@ if uploaded_file is not None:
             # 2. Leitura do arquivo (usando o separador ;)
             df = pd.read_csv(uploaded_file, delimiter=";")
             
-            # --- CORREÇÃO: Limpeza e Conversão de Colunas Numéricas ---
+            # --- Limpeza e Conversão de Colunas Numéricas ---
             
-            # 1. Definir as colunas que DEVEM ser numéricas no formato Real Brasileiro
+            # Definir as colunas que DEVEM ser numéricas no formato Real Brasileiro
             colunas_numericas = [
                 "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
 
-            # 2. Iterar e limpar cada coluna
+            # Iterar e limpar cada coluna
             for col in colunas_numericas:
                 if col in df.columns:
-                    # Remove R$, parênteses, pontos de milhar, e substitui vírgula decimal por ponto
                     df[col] = (
                         df[col]
-                        .astype(str) # Garante que está como string para a limpeza
-                        .str.replace(r'[R$\(\)]', '', regex=True) # Remove R$, (, e )
-                        .str.replace('.', '', regex=False) # Remove pontos (separador de milhares)
-                        .str.replace(',', '.', regex=False) # Troca vírgula por ponto (separador decimal)
-                        .str.strip() # Remove espaços em branco
+                        .astype(str)
+                        .str.replace(r'[R$\(\)]', '', regex=True)
+                        .str.replace('.', '', regex=False)
+                        .str.replace(',', '.', regex=False)
+                        .str.strip()
                     )
-                    # Força a conversão para numérico (float). errors='coerce' transforma erros em NaN.
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                     
-            # 3. Tratar colunas categóricas e verificar a existência das colunas críticas
+            # Tratar colunas categóricas e verificar a existência das colunas críticas
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
             if not all(col in df.columns for col in colunas_criticas):
                  st.error(f"Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
@@ -67,38 +65,39 @@ if uploaded_file is not None:
             df["STATUS"] = df["STATUS"].astype(str)
                  
         except Exception as e:
-            # CORREÇÃO DA SINTAXE DE F-STRING AQUI (Linha 70 anterior)
             st.error(f"Ocorreu um erro fatal durante a leitura ou limpeza dos dados. Detalhes: {e}")
             st.stop()
 
 
     # --- Filtros (na Sidebar) ---
     with st.sidebar:
-        st.markdown("---") # Linha separadora
+        st.markdown("---")
         st.header("Filtros Analíticos")
         
         entes_lista = df["ENTE"].unique().tolist()
         status_lista = df["STATUS"].unique().tolist()
         
-        # Filtro Multiselect
-        selected_entes = st.multiselect(
-            "Ente(s) Devedor(es):", 
-            options=entes_lista, default=entes_lista
+        # FILTRO DE ENTE AGORA É LISTA SUSPENSA (st.selectbox)
+        selected_ente = st.selectbox(
+            "Ente Devedor:", 
+            options=["Todos"] + sorted(entes_lista) # Opção "Todos" + Entes em ordem alfabética
         )
         
-        # Filtro Selectbox
+        # Filtro Selectbox de Status
         selected_status = st.selectbox(
             "Status da Dívida:", 
             options=["Todos"] + status_lista
         )
     
     # 4. Aplicação dos filtros
+    # Lógica de filtro para ENTE (se "Todos", filtra todos)
+    filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
     filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
-    filtro_entes = df["ENTE"].isin(selected_entes)
+    
     df_filtrado = df[filtro_status & filtro_entes]
     
     # ----------------------------------------------------
-    # Visualização Principal (Mais Formal)
+    # Visualização Principal (Modo Escuro e Formal)
     # ----------------------------------------------------
     
     if df_filtrado.empty:
@@ -131,7 +130,7 @@ if uploaded_file is not None:
             color="STATUS",
             labels={"ENTE": "Ente Devedor", "ENDIVIDAMENTO TOTAL": "Endividamento Total (R$)"},
             height=500,
-            template="plotly_white", # Tema mais limpo e formal
+            template="plotly_dark", # TEMA ESCURO
             title="Endividamento Total por Ente (Ordem Decrescente)"
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -139,9 +138,7 @@ if uploaded_file is not None:
         # Gráfico 2: Aportes por Tribunal
         st.subheader("2. Comparativo de Aportes por Tribunal")
         
-        # Tentativa de criar o gráfico de Aportes
         try:
-            # Agrupando os dados para o gráfico de aportes (mais limpo)
             df_aportes_viz = df_filtrado.melt(
                 id_vars="ENTE", 
                 value_vars=["APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"],
@@ -157,22 +154,21 @@ if uploaded_file is not None:
                 barmode="group",
                 labels={"ENTE": "Ente Devedor", "Valor Aportado": "Valor Aportado (R$)", "Tribunal": "Tribunal de Referência"},
                 height=500,
-                template="plotly_white",
+                template="plotly_dark", # TEMA ESCURO
                 title="Aportes Detalhados por Ente e Tribunal"
             )
             st.plotly_chart(fig_aportes, use_container_width=True)
         except Exception:
-            st.warning("Não foi possível gerar o gráfico de Aportes. Verifique se as colunas 'APORTES - [TJPE]', 'APORTES - [TRF5]' e 'APORTES - [TRT6]' existem no arquivo com valores numéricos.")
+            st.warning("Não foi possível gerar o gráfico de Aportes. Verifique se as colunas de aportes por Tribunal estão corretas.")
 
         # Tabela de Dados (Mais Formal)
         st.header("Tabela de Dados Brutos (Filtrados)")
-        # Seleciona apenas as colunas que você listou anteriormente para a tabela
+        
         colunas_tabela = [
             "ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", 
             "DÍVIDA EM MORA / RCL", "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6"
         ]
         
-        # Filtra a tabela para garantir que apenas colunas existentes sejam mostradas
         colunas_existentes_tabela = [col for col in colunas_tabela if col in df_filtrado.columns]
         
         st.dataframe(
