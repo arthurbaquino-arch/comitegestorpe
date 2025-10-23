@@ -1,12 +1,11 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import numpy as np # Necessário para identificar NaN
 
 # --- Configuração da página ---
 st.set_page_config(
-    page_title="Dashboard de Precatórios - EC 136/2025",
-    layout="wide",
+    page_title="Painel de Controle: Monitoramento de Precatórios (EC 136/2025)",
+    layout="wide", # Usar a largura máxima da tela
     initial_sidebar_state="expanded"
 )
 
@@ -21,29 +20,27 @@ with st.sidebar:
         help="O arquivo deve ser formatado com ponto-e-vírgula (;)"
     )
 
-st.title("Monitoramento de Precatórios (EC 136/2025)")
-st.caption("Organização e Análise por Ente Devedor")
+st.title("Painel de Controle: Precatórios por Ente Devedor")
+st.markdown("---") # Linha separadora elegante
 
 # ----------------------------------------------------
 # Processamento Condicional
 # ----------------------------------------------------
 if uploaded_file is not None:
     # Adicionar um 'spinner' para dar feedback profissional
-    with st.spinner('Processando e limpando dados...'):
+    with st.spinner('Carregando e processando os indicadores...'):
         try:
             # 2. Leitura do arquivo (usando o separador ;)
             df = pd.read_csv(uploaded_file, delimiter=";")
             
-            # --- Limpeza e Conversão de Colunas Numéricas ---
+            # --- Limpeza e Conversão de Colunas Numéricas (Corrigindo o erro 'f' para 'str') ---
             
-            # Definir as colunas que DEVEM ser numéricas no formato Real Brasileiro
             colunas_numericas = [
                 "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
 
-            # Iterar e limpar cada coluna
             for col in colunas_numericas:
                 if col in df.columns:
                     df[col] = (
@@ -56,137 +53,135 @@ if uploaded_file is not None:
                     )
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                     
-            # Tratar colunas categóricas e verificar a existência das colunas críticas
+            # 3. Verificação de Colunas Críticas
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
             if not all(col in df.columns for col in colunas_criticas):
                  st.error(f"Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
                  st.stop()
                  
             df["ENTE"] = df["ENTE"].astype(str)
-            # A coluna STATUS deve ser tratada ANTES de criar a lista de filtros
             df["STATUS"] = df["STATUS"].astype(str)
-                 
-        except Exception as e:
-            st.error(f"Ocorreu um erro fatal durante a leitura ou limpeza dos dados. Detalhes: {e}")
-            st.stop()
-
-
-    # --- Filtros (na Sidebar) ---
-    with st.sidebar:
-        st.markdown("---")
-        st.header("Filtros Analíticos")
-        
-        # CORREÇÃO PARA REMOVER 'nan' DOS FILTROS
-        # Usa dropna() para remover linhas que têm valor NaN no Status,
-        # mas apenas para a CRIAÇÃO da lista de filtros.
-        
-        # Filtra o DF APENAS para pegar os valores únicos não nulos da coluna STATUS
-        status_lista_limpa = df["STATUS"].dropna().unique().tolist()
-        
-        # O np.nan existe se a coluna for inicialmente lida como numérica.
-        # Filtra a lista para remover explicitamente o string 'nan' e NaN de Numpy
-        status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
-        
-        entes_lista = df["ENTE"].unique().tolist()
-        
-        # Filtro Selectbox Ente Devedor
-        selected_ente = st.selectbox(
-            "Ente Devedor:", 
-            options=["Todos"] + sorted(entes_lista) 
-        )
-        
-        # Filtro Selectbox de Status (agora sem 'nan' na lista de opções)
-        selected_status = st.selectbox(
-            "Status da Dívida:", 
-            options=["Todos"] + sorted(status_lista)
-        )
-    
-    # 4. Aplicação dos filtros
-    filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
-    filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
-    
-    df_filtrado = df[filtro_status & filtro_entes]
-    
-    # ----------------------------------------------------
-    # Visualização Principal (Modo Escuro e Formal)
-    # ----------------------------------------------------
-    
-    if df_filtrado.empty:
-        st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros na barra lateral.")
-    else:
-        
-        # Exibição de Métricas Chave (KPls) em colunas
-        total_divida = df_filtrado["ENDIVIDAMENTO TOTAL"].sum()
-        total_aportes = df_filtrado["APORTES"].sum()
-        num_entes = df_filtrado["ENTE"].nunique()
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
-        with col2:
-            st.metric(label="Endividamento Total (R$)", value=f"R$ {total_divida:,.2f}")
-        with col3:
-            st.metric(label="Total de Aportes Realizados (R$)", value=f"R$ {total_aportes:,.2f}")
-
-
-        st.header("Análise Detalhada dos Entes Devedores")
-        
-        # Gráfico 1: Endividamento Total
-        st.subheader("1. Dívida Consolidada por Ente e Status")
-        fig = px.bar(
-            df_filtrado.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False),
-            x="ENTE",
-            y="ENDIVIDAMENTO TOTAL",
-            color="STATUS",
-            labels={"ENTE": "Ente Devedor", "ENDIVIDAMENTO TOTAL": "Endividamento Total (R$)"},
-            height=500,
-            template="plotly_dark", 
-            title="Endividamento Total por Ente (Ordem Decrescente)"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Gráfico 2: Aportes por Tribunal
-        st.subheader("2. Comparativo de Aportes por Tribunal")
-        
-        try:
-            df_aportes_viz = df_filtrado.melt(
-                id_vars="ENTE", 
-                value_vars=["APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"],
-                var_name="Tribunal",
-                value_name="Valor Aportado"
-            )
             
-            fig_aportes = px.bar(
-                df_aportes_viz,
-                x="ENTE",
-                y="Valor Aportado",
-                color="Tribunal",
-                barmode="group",
-                labels={"ENTE": "Ente Devedor", "Valor Aportado": "Valor Aportado (R$)", "Tribunal": "Tribunal de Referência"},
-                height=500,
-                template="plotly_dark", 
-                title="Aportes Detalhados por Ente e Tribunal"
-            )
-            st.plotly_chart(fig_aportes, use_container_width=True)
-        except Exception:
-            st.warning("Não foi possível gerar o gráfico de Aportes. Verifique se as colunas de aportes por Tribunal estão corretas.")
+            # --- Filtros (na Sidebar) ---
+            with st.sidebar:
+                st.markdown("---")
+                st.header("Filtros Analíticos")
+                
+                # Remoção do 'nan' para filtros limpos
+                status_lista_limpa = df["STATUS"].dropna().unique().tolist()
+                status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
+                entes_lista = df["ENTE"].unique().tolist()
+                
+                # Filtro Selectbox Ente Devedor
+                selected_ente = st.selectbox(
+                    "Ente Devedor:", 
+                    options=["Todos"] + sorted(entes_lista) 
+                )
+                
+                # Filtro Selectbox de Status
+                selected_status = st.selectbox(
+                    "Status da Dívida:", 
+                    options=["Todos"] + sorted(status_lista)
+                )
+            
+            # 4. Aplicação dos filtros
+            filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
+            filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
+            
+            df_filtrado = df[filtro_status & filtro_entes]
+            
+            # ----------------------------------------------------
+            # Novo Layout: Foco em Painel e KPIs (Dark Mode)
+            # ----------------------------------------------------
+            
+            if df_filtrado.empty:
+                st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros na barra lateral.")
+            else:
+                
+                # --- Seção 1: Indicadores Chave (KPIs) ---
+                st.header("Indicadores de Desempenho Chave")
+                
+                # Cálculo dos KPIs
+                total_divida = df_filtrado["ENDIVIDAMENTO TOTAL"].sum()
+                total_aportes = df_filtrado["APORTES"].sum()
+                saldo_a_pagar = df_filtrado["SALDO A PAGAR"].sum()
+                num_entes = df_filtrado["ENTE"].nunique()
+                
+                # Layout de colunas para os KPIs
+                col_entes, col_divida, col_aportes, col_saldo = st.columns(4)
+                
+                with col_entes:
+                    st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
+                with col_divida:
+                    # Usando delta para mostrar a diferença (pode ser ajustado para mostrar a dívida anterior, se disponível)
+                    st.metric(label="Endividamento Total (R$)", value=f"R$ {total_divida:,.2f}")
+                with col_aportes:
+                    st.metric(label="Total de Aportes (R$)", value=f"R$ {total_aportes:,.2f}")
+                with col_saldo:
+                    st.metric(label="Saldo Remanescente a Pagar (R$)", value=f"R$ {saldo_a_pagar:,.2f}")
+                
+                st.markdown("---") 
 
-        # Tabela de Dados (Mais Formal)
-        st.header("Tabela de Dados Brutos (Filtrados)")
-        
-        colunas_tabela = [
-            "ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", 
-            "DÍVIDA EM MORA / RCL", "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6"
-        ]
-        
-        colunas_existentes_tabela = [col for col in colunas_tabela if col in df_filtrado.columns]
-        
-        st.dataframe(
-            df_filtrado[colunas_existentes_tabela].sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False), 
-            use_container_width=True
-        )
+                # --- Seção 2: Tabela de Status e Dívida por Ente ---
+                st.header("Resumo da Situação por Ente")
+                
+                # Tabela Consolidada (Mais limpa e com formatação de números)
+                df_resumo = df_filtrado[[
+                    "ENTE", 
+                    "STATUS", 
+                    "ENDIVIDAMENTO TOTAL", 
+                    "APORTES", 
+                    "SALDO A PAGAR",
+                    "DÍVIDA EM MORA / RCL"
+                ]].sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False).fillna('-')
+
+                # Formatação de Moeda na Tabela
+                df_resumo_styled = df_resumo.style.format({
+                    "ENDIVIDAMENTO TOTAL": "R$ {:,.2f}",
+                    "APORTES": "R$ {:,.2f}",
+                    "SALDO A PAGAR": "R$ {:,.2f}",
+                    "DÍVIDA EM MORA / RCL": "{:.2f}%"
+                })
+
+                st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+
+                # --- Seção 3: Detalhes dos Índices e Aportes (em abas) ---
+                st.header("Análise Detalhada de Índices e Aportes")
+                
+                tab1, tab2 = st.tabs(["📊 Índices e RCL", "🏛️ Aportes por Tribunal"])
+                
+                with tab1:
+                    st.subheader("Índices e Responsabilidade Fiscal")
+                    df_indices = df_filtrado[[
+                        "ENTE", 
+                        "RCL 2024", 
+                        "DÍVIDA EM MORA / RCL"
+                    ]].sort_values(by="DÍVIDA EM MORA / RCL", ascending=False).fillna('-')
+                    
+                    df_indices_styled = df_indices.style.format({
+                        "RCL 2024": "R$ {:,.2f}",
+                        "DÍVIDA EM MORA / RCL": "{:.2f}%"
+                    })
+                    st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
+
+                with tab2:
+                    st.subheader("Distribuição de Aportes (TJPE, TRF5, TRT6)")
+                    colunas_aportes = ["ENTE", "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]
+                    
+                    df_aportes = df_filtrado[[col for col in colunas_aportes if col in df_filtrado.columns]].fillna(0)
+                    
+                    df_aportes_styled = df_aportes.style.format({
+                        "APORTES - [TJPE]": "R$ {:,.2f}",
+                        "APORTES - [TRF5]": "R$ {:,.2f}",
+                        "APORTES - [TRT6]": "R$ {:,.2f}",
+                    })
+                    st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
+                
+        except Exception as e:
+            st.error(f"Ocorreu um erro inesperado. Detalhes: {e}")
 
 else:
     # Mensagem quando o arquivo não está carregado
-    st.info("Por favor, acesse a **barra lateral (seta superior esquerda)** e carregue o seu arquivo CSV para iniciar a análise do dashboard.")
+    st.info("Por favor, acesse a **barra lateral (seta superior esquerda)** e carregue o seu arquivo CSV para iniciar a análise do painel de controle.")
