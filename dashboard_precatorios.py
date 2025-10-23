@@ -92,7 +92,7 @@ if uploaded_file is not None:
             df_filtrado = df[filtro_status & filtro_entes]
             
             # ----------------------------------------------------
-            # INÍCIO DO NOVO LAYOUT 1: FOCO E DETALHE
+            # INÍCIO DO LAYOUT 1: FOCO E DETALHE
             # ----------------------------------------------------
             
             if df_filtrado.empty:
@@ -113,3 +113,78 @@ if uploaded_file is not None:
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
                 with col_divida:
+                    # CORREÇÃO DA INDENTAÇÃO FOI APLICADA AQUI
+                    st.metric(label="Endividamento Total (R$)", value=formatar_br(total_divida, 'moeda'))
+                with col_aportes:
+                    st.metric(label="Total de Aportes (R$)", value=formatar_br(total_aportes, 'moeda'))
+                with col_saldo:
+                    st.metric(label="Saldo Remanescente a Pagar (R$)", value=formatar_br(saldo_a_pagar, 'moeda'))
+                
+                st.markdown("---") 
+
+                # --- Seção 2: Tabela Principal (Resumo de Foco) ---
+                st.header("📋 Resumo da Situação por Ente (Foco Principal)")
+                
+                colunas_resumo = [
+                    "ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR",
+                    "DÍVIDA EM MORA / RCL"
+                ]
+                
+                df_resumo = df_filtrado[[col for col in colunas_resumo if col in df_filtrado.columns]].sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
+                df_resumo_styled = df_resumo.copy()
+                
+                # Aplica a formatação de moeda e percentual
+                for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
+                    if col in df_resumo_styled.columns:
+                        df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
+                        
+                if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
+                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'percentual'))
+
+                # Tabela de foco (maior)
+                st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+
+                # --- Seção 3: Detalhes Técnicos (Abas) ---
+                st.header("🔎 Análise Detalhada de Índices e Aportes")
+                
+                # Abas para separar os detalhes técnicos (Layout 1)
+                tab1, tab2 = st.tabs(["📊 Índices Fiscais e RCL", "⚖️ Aportes Detalhados por Tribunal"])
+                
+                with tab1:
+                    st.subheader("RCL e Percentuais por Tribunal")
+                    colunas_indices = ["ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+                    
+                    df_indices = df_filtrado[[col for col in colunas_indices if col in df_filtrado.columns]].sort_values(by="DÍVIDA EM MORA / RCL", ascending=False)
+                    df_indices_styled = df_indices.copy()
+                    
+                    # Formatação
+                    if "RCL 2024" in df_indices_styled.columns:
+                        df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: formatar_br(x, 'moeda'))
+                    for col in ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]:
+                        if col in df_indices_styled.columns:
+                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: formatar_br(x, 'percentual'))
+                        
+                    st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
+
+                with tab2:
+                    st.subheader("Valores Aportados por Tribunal")
+                    colunas_aportes = ["ENTE", "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]
+                    
+                    df_aportes = df_filtrado[[col for col in colunas_aportes if col in df_filtrado.columns]]
+                    df_aportes_styled = df_aportes.copy()
+                    
+                    # Formatação
+                    for col in ["APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]:
+                        if col in df_aportes_styled.columns:
+                             df_aportes_styled[col] = df_aportes_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
+
+                    st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
+                
+        except Exception as e:
+            st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto (separador ';'). Detalhes: {e}")
+
+else:
+    # Mensagem quando o arquivo não está carregado
+    st.info("ℹ️ Por favor, acesse a **barra lateral (seta superior esquerda)** e carregue o seu arquivo CSV para iniciar a análise do painel de controle.")
