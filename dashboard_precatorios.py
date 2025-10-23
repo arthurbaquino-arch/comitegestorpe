@@ -22,8 +22,8 @@ def formatar_br(valor, formato):
         if formato == 'moeda':
             return f"R$ {valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         elif formato == 'percentual':
-            # NOVO: Multiplica o valor por 100 para exibi-lo como percentual (0.0041 vira 0.41%)
-            return f"{valor * 100:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+            # Mantém: Assume que o valor recebido (ex: 0.41 ou 95) é o valor numérico a ser formatado com %.
+            return f"{valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         else: # Formato genérico com 2 casas
             return f"{valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
     except Exception:
@@ -55,34 +55,29 @@ if uploaded_file is not None:
         try:
             df = pd.read_csv(uploaded_file, delimiter=";")
             
-            # --- CORREÇÃO: REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
+            # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1]
             
-            # --- Limpeza e Conversão de Colunas Numéricas (Aprimorada) ---
+            # --- Limpeza e Conversão de Colunas Numéricas (Otimizada) ---
             colunas_numericas = [
                 "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
             
-            colunas_percentual = ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
-            
+            # Colunas que podem vir com o ponto decimal (padrão Americano) ou vírgula (padrão Brasileiro)
             for col in colunas_numericas:
                 if col in df.columns:
-                    # 1. Tenta limpar e converter para número
-                    df[col] = (df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True) 
-                        .str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.strip())
+                    # 1. Limpeza padrão: remove R$, (), %
+                    df[col] = df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True).str.strip()
                     
+                    # 2. CORREÇÃO PRINCIPAL: Troca a VÍRGULA por PONTO antes de converter, para que o pandas leia o decimal.
+                    # Se o seu CSV usa vírgula como decimal (padrão BR), essa linha é essencial.
+                    df[col] = df[col].str.replace(',', '.', regex=False)
+                    
+                    # 3. Conversão para float (coerce = vira NaN se falhar)
                     df[col] = pd.to_numeric(df[col], errors='coerce')
 
-                    # 2. **CORREÇÃO DE ESCALA PARA PERCENTUAIS:** Se for uma coluna de percentual 
-                    # e o valor for maior que 1.0 (indicando que está na escala 1-100), divide por 100.
-                    if col in colunas_percentual:
-                        # Identifica os valores que são números válidos e maiores que 1.0
-                        condicao_ajuste = (df[col].notna()) & (df[col] > 1.0)
-                        # Aplica a divisão
-                        df.loc[condicao_ajuste, col] = df.loc[condicao_ajuste, col] / 100
-                    
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
             if not all(col in df.columns for col in colunas_criticas):
                  st.error(f"Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
@@ -153,7 +148,6 @@ if uploaded_file is not None:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: formatar_br(x, 'moeda'))
                         
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
-                    # Usamos a função formatar_br() que agora trata o percentual
                     df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: formatar_br(x, 'percentual'))
 
                 st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
@@ -176,7 +170,6 @@ if uploaded_file is not None:
                         df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: formatar_br(x, 'moeda'))
                     for col in ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]:
                         if col in df_indices_styled.columns:
-                            # Usamos a função formatar_br() que agora trata o percentual
                             df_indices_styled[col] = df_indices_styled[col].apply(lambda x: formatar_br(x, 'percentual'))
                         
                     st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
