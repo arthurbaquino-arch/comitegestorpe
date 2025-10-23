@@ -2,6 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np 
 from typing import Union
+import os # Importação para ajudar a verificar o caminho do arquivo
+
+# ----------------------------------------------------
+# CONFIGURAÇÃO DO ARQUIVO FIXO
+# ----------------------------------------------------
+# Mantenha o arquivo "Painel-Entes.csv" no mesmo diretório do seu script.
+# Se o arquivo estiver em outro local, altere o caminho aqui:
+FILE_PATH = "Painel-Entes.csv"
+
 
 # --- Configuração da página ---
 st.set_page_config(
@@ -11,9 +20,8 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Final)
+# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Mantida)
 # ----------------------------------------------------
-# Nota: Union[str, float, int] indica que a função pode receber string ou número
 def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
     Formata um valor (string BR ou float) para o padrão monetário/percentual brasileiro.
@@ -57,30 +65,25 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 
 
 # ----------------------------------------------------
-# 1. Widget de Upload (na Sidebar)
+# TÍTULOS E LAYOUT INICIAL
 # ----------------------------------------------------
-with st.sidebar:
-    st.header("📁 Upload de Dados")
-    uploaded_file = st.file_uploader(
-        "1. Carregar 'Painel-Entes.csv'",
-        type=['csv'],
-        help="O arquivo deve ser formatado com ponto-e-vírgula (;)"
-    )
-
-# TÍTULO EM AZUL PROFUNDO
 st.markdown("<h1 style='color: #00BFFF;'>💰 Visão Geral Financeira de Precatórios</h1>", unsafe_allow_html=True)
 st.caption("Organização Foco e Detalhe por Ente Devedor")
 st.markdown("---") 
 
 # ----------------------------------------------------
-# Processamento Condicional
+# Processamento Condicional - AGORA LENDO DIRETAMENTE DO DISCO
 # ----------------------------------------------------
-if uploaded_file is not None:
-    
+
+# Verifica se o arquivo existe antes de tentar ler
+if not os.path.exists(FILE_PATH):
+    st.error(f"❌ Erro: O arquivo de dados '{FILE_PATH}' não foi encontrado.")
+    st.info("Por favor, garanta que o arquivo CSV esteja no mesmo diretório do script.")
+else:
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # Lendo o CSV SEM FORÇAR NENHUM TIPO (Todos como string)
-            df = pd.read_csv(uploaded_file, delimiter=";")
+            # 1. Lendo o CSV DIRETAMENTE DO DISCO
+            df = pd.read_csv(FILE_PATH, delimiter=";")
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1].copy()
@@ -98,24 +101,24 @@ if uploaded_file is not None:
             # Aplica a limpeza e conversão de formato BR para float em todas as colunas numéricas
             for col in colunas_para_float:
                 if col in df_float.columns:
-                    # O tratamento BR->Float está na função converter_e_formatar, mas o Pandas é mais rápido
                     # Limpa símbolos
                     str_series = df_float[col].astype(str).str.strip().str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
 
-                    # Lógica de conversão BR para Float (sem regex)
-                    # É NECESSÁRIO forçar regex=False em algumas versões
+                    # Lógica de conversão BR para Float 
                     try:
+                        # Tenta usar regex=False (melhor para compatibilidade em algumas versões)
                         str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                     except TypeError:
-                        str_limpa = str_series.str.replace('.', 'TEMP').str.replace(',', '.').str.replace('TEMP', '') # fallback
+                        # Fallback se regex=False não for suportado
+                        str_limpa = str_series.str.replace('.', 'TEMP').str.replace(',', '.').str.replace('TEMP', '')
                     
                     df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
-            # Verificação crítica de colunas. Adicionando PARCELA ANUAL na verificação.
+            # Verificação crítica de colunas.
             colunas_criticas = ["ENTE", "STATUS", "PARCELA ANUAL", "APORTES"]
             if not all(col in df_float.columns for col in colunas_criticas):
-                 st.error(f"Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
+                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
                  st.stop()
                  
             df["ENTE"] = df["ENTE"].astype(str)
@@ -123,7 +126,6 @@ if uploaded_file is not None:
             
             # --- Filtros (na Sidebar) ---
             with st.sidebar:
-                st.markdown("---")
                 st.header("⚙️ Filtros Analíticos")
                 
                 status_lista_limpa = df["STATUS"].dropna().unique().tolist()
@@ -163,7 +165,6 @@ if uploaded_file is not None:
                 
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
-                # A função agora recebe um float e formata corretamente
                 with col_parcela_anual:
                     st.metric(label="Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
@@ -174,7 +175,6 @@ if uploaded_file is not None:
                 st.markdown("---") 
 
                 # --- Seção 2: Tabela Principal (Resumo de Foco) ---
-                # ALTERADO: REMOVIDO "(Foco Principal)" DO TÍTULO
                 st.header("📋 Resumo da Situação por Ente")
                 
                 colunas_resumo = [
@@ -239,7 +239,3 @@ if uploaded_file is not None:
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto (separador ';'). Detalhes: {e}")
-
-else:
-    # Mensagem quando o arquivo não está carregado
-    st.info("ℹ️ Por favor, acesse a **barra lateral (seta superior esquerda)** e carregue o seu arquivo CSV para iniciar a análise do painel de controle.")
