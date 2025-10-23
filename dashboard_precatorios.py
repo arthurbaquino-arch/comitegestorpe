@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np 
 from typing import Union
-import os # Importação para ajudar a verificar o caminho do arquivo
+import os 
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO
 # ----------------------------------------------------
 # Mantenha o arquivo "Painel-Entes.csv" no mesmo diretório do seu script.
-# Se o arquivo estiver em outro local, altere o caminho aqui:
 FILE_PATH = "Painel-Entes.csv"
 
 
@@ -85,6 +84,9 @@ else:
             # 1. Lendo o CSV DIRETAMENTE DO DISCO
             df = pd.read_csv(FILE_PATH, delimiter=";")
             
+            # --- CORREÇÃO CRÍTICA: Remove espaços em branco do início/fim dos nomes das colunas ---
+            df.columns = df.columns.str.strip()
+            
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1].copy()
             
@@ -115,10 +117,11 @@ else:
                     df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
-            # Verificação crítica de colunas.
+            # Verificação crítica de colunas. Se "PARCELA ANUAL" ainda não existir, o erro será exibido.
             colunas_criticas = ["ENTE", "STATUS", "PARCELA ANUAL", "APORTES"]
             if not all(col in df_float.columns for col in colunas_criticas):
                  st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
+                 # Se o erro persistir, verifique a ortografia exata da coluna 'PARCELA ANUAL' no seu CSV.
                  st.stop()
                  
             df["ENTE"] = df["ENTE"].astype(str)
@@ -238,4 +241,5 @@ else:
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
+            # Esta linha está aqui para capturar qualquer outro erro que possa surgir.
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto (separador ';'). Detalhes: {e}")
