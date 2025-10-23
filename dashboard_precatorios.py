@@ -5,10 +5,10 @@ from typing import Union
 import os 
 
 # ----------------------------------------------------
-# CONFIGURAÇÃO DO ARQUIVO FIXO
+# CONFIGURAÇÃO DO ARQUIVO FIXO (MANTENHA ESTE NOME NO SEU DIRETÓRIO)
 # ----------------------------------------------------
-# Mantenha o arquivo "Painel-Entes.csv" no mesmo diretório do seu script.
-FILE_PATH = "Painel Entes.csv"  # Verificando o nome exato do arquivo
+# ⚠️ GARANTA que o arquivo 'Painel Entes.csv' esteja no MESMO DIRETÓRIO do script.
+FILE_PATH = "Painel Entes.csv"
 COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
 COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES"]
 
@@ -16,7 +16,7 @@ COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES"]
 # --- Configuração da página ---
 st.set_page_config(
     page_title="💰 Painel de Precatórios: Foco e Detalhe",
-    layout="wide", # Usar a largura máxima da tela
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
@@ -26,32 +26,24 @@ st.set_page_config(
 def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
     Formata um valor (string BR ou float) para o padrão monetário/percentual brasileiro.
-    A lógica de conversão string->float só é aplicada se o input for uma string.
     """
     if pd.isna(valor) or valor is None or valor == "":
         return "-"
     
     num_valor = None
     
-    # 1. Tentar obter o valor numérico
     if isinstance(valor, (float, int, np.number)):
-        # Se já é um número (como o resultado de .sum()), use-o diretamente.
         num_valor = float(valor)
     else:
-        # Se é uma string (dado bruto do CSV), limpar e converter.
         str_valor = str(valor).strip()
-        # Limpeza de Símbolos Sequencial
         str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
 
         try:
-            # Lógica de conversão BR (vírgula decimal) para Float (ponto decimal)
             str_float = str_limpa.replace('.', 'TEMP').replace(',', '.').replace('TEMP', '')
             num_valor = float(str_float)
         except Exception:
-            # Se a string não puder ser convertida, retorna o valor de erro
             return "-"
 
-    # 2. Formatação (Garantido que num_valor é um float aqui)
     try:
         if formato == 'moeda':
             # Formata o float (ex: 1234567.89) para R$ 1.234.567,89
@@ -73,21 +65,24 @@ st.caption("Organização Foco e Detalhe por Ente Devedor")
 st.markdown("---") 
 
 # ----------------------------------------------------
-# Processamento Condicional - AGORA LENDO DIRETAMENTE DO DISCO
+# Processamento Condicional - LENDO DIRETAMENTE DO DISCO
 # ----------------------------------------------------
 
 # Verifica se o arquivo existe antes de tentar ler
 if not os.path.exists(FILE_PATH):
     st.error(f"❌ Erro: O arquivo de dados '{FILE_PATH}' não foi encontrado.")
-    st.info("Por favor, garanta que o arquivo CSV esteja no mesmo diretório do script.")
+    st.info("Para que este código funcione, garanta que o arquivo CSV (`Painel Entes.csv`) esteja no mesmo diretório do script.")
 else:
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # 1. Lendo o CSV DIRETAMENTE DO DISCO COM ENCODING E FORÇANDO O CABEÇALHO
-            # Usando 'latin1' (ou 'ISO-8859-1') para lidar com caracteres especiais do português
+            # 1. Lendo o CSV: Usando ENCODING='latin1' e forçando HEADER=0 para compatibilidade
             df = pd.read_csv(FILE_PATH, delimiter=";", encoding='latin1', header=0)
             
-            # --- CORREÇÃO CRÍTICA: Remove espaços em branco do início/fim dos nomes das colunas ---
+            # --- CORREÇÃO CRÍTICA: Remove o caractere BOM (ï»¿) ---
+            # Este passo resolve o erro específico com a coluna 'ENTE'
+            df.columns = df.columns.str.replace('\ufeff', '', regex=False)
+            
+            # --- CORREÇÃO SECUNDÁRIA: Remove espaços em branco do início/fim dos nomes das colunas ---
             df.columns = df.columns.str.strip()
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
@@ -116,10 +111,7 @@ else:
             # Aplica a limpeza e conversão de formato BR para float em todas as colunas numéricas
             for col in colunas_para_float:
                 if col in df_float.columns:
-                    # Limpa símbolos
                     str_series = df_float[col].astype(str).str.strip().str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
-
-                    # Lógica de conversão BR para Float 
                     try:
                         str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                     except TypeError:
@@ -146,9 +138,7 @@ else:
             filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
             
-            # Filtrado para exibição (DF_FILTRADO_EXIBICAO)
             df_filtrado_exibicao = df[filtro_status & filtro_entes]
-            # Filtrado para cálculos (DF_FLOAT_FILTRADO)
             df_filtrado_calculo = df_float[filtro_status & filtro_entes]
             
             # ----------------------------------------------------
@@ -162,7 +152,6 @@ else:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # USANDO A COLUNA CORRETA (PARCELA ANUAL)
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
@@ -189,14 +178,11 @@ else:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                # ORDENAÇÃO USANDO O DF DE CÁLCULO (garante ordem numérica correta)
                 df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 
-                # SELECIONA AS LINHAS ORDENADAS NO DF DE EXIBIÇÃO (DF_FILTRADO_EXIBICAO)
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                 df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
                 
-                # APLICA FORMATO (recebendo a STRING ORIGINAL do DF de exibição)
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
@@ -215,7 +201,6 @@ else:
                 
                 with tab1:
                     st.subheader("RCL e Percentuais por Tribunal")
-                    # USANDO A COLUNA CORRETA (PARCELA ANUAL) NA TABELA DE DETALHE
                     colunas_indices = ["ENTE", "RCL 2024", COLUNA_PARCELA_ANUAL, "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
                     
                     df_indices = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
