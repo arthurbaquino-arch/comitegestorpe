@@ -39,6 +39,7 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
         str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
 
         try:
+            # Lógica de conversão BR (vírgula decimal) para Float (ponto decimal)
             str_float = str_limpa.replace('.', 'TEMP').replace(',', '.').replace('TEMP', '')
             num_valor = float(str_float)
         except Exception:
@@ -76,16 +77,16 @@ else:
             # 1. Lendo o CSV: Usando ENCODING='latin1' para maior compatibilidade com arquivos BR
             df = pd.read_csv(FILE_PATH, delimiter=";", encoding='latin1', header=0)
             
-            # --- CORREÇÃO CRÍTICA 1: Remove o caractere BOM (Byte Order Mark - \ufeff ou ï»¿) ---
-            df.columns = df.columns.str.replace('\ufeff', '', regex=False)
-            
+            # --- CORREÇÃO CRÍTICA 1: Força o nome 'ENTE' removendo o caractere BOM persistente ---
+            # Verifica se a coluna problemática existe e a renomeia.
+            if 'ï»¿ENTE' in df.columns:
+                df.rename(columns={'ï»¿ENTE': 'ENTE'}, inplace=True)
+            # Se for lido com UTF-8, o caractere BOM é '\ufeff'
+            elif '\ufeffENTE' in df.columns:
+                 df.rename(columns={'\ufeffENTE': 'ENTE'}, inplace=True)
+
             # --- CORREÇÃO CRÍTICA 2: Remove espaços em branco do início/fim dos nomes das colunas ---
             df.columns = df.columns.str.strip()
-
-            # --- CORREÇÃO CRÍTICA 3: Força a correção de nomes de colunas que vieram com erro de codificação (DÃVIDA) ---
-            # O nome da coluna pode ter sido lido de forma diferente, então corrigimos o alvo.
-            df.columns = df.columns.str.replace('DÃVIDA EM MORA / RCL', 'DÍVIDA EM MORA / RCL', regex=False)
-            
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
             
@@ -180,11 +181,11 @@ else:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                # Certifique-se de que a coluna "ENDIVIDAMENTO TOTAL" existe antes de ordenar
                 if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
+                    # Tenta ordenar apenas se a coluna de ordenação existir
                     df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 else:
-                    df_resumo_float = df_filtrado_calculo # Não ordena se não tiver a coluna
+                    df_resumo_float = df_filtrado_calculo 
 
                 
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
@@ -237,4 +238,5 @@ else:
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
-            st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto (separador ';'). Detalhes: {e}")
+            st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
+            st.warning("Se o erro persistir, pode haver um problema na estrutura de alguma coluna do seu novo CSV.")
