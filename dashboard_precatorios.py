@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np 
+from typing import Union
 
 # --- Configuração da página ---
 st.set_page_config(
@@ -10,29 +11,39 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Mais Simples e Compatível)
+# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Final)
 # ----------------------------------------------------
-def converter_e_formatar(valor, formato):
+# Nota: Union[str, float, int] indica que a função pode receber string ou número
+def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
-    Tenta converter uma string (formato BR) para float e a formata.
-    Se falhar, retorna o valor original (string) ou '-'.
+    Formata um valor (string BR ou float) para o padrão monetário/percentual brasileiro.
+    A lógica de conversão string->float só é aplicada se o input for uma string.
     """
     if pd.isna(valor) or valor is None or valor == "":
         return "-"
     
-    str_valor = str(valor).strip()
+    num_valor = None
     
-    # 1. Limpeza dos Símbolos: REMOVENDO R$, (), % DE FORMA SEQUENCIAL E COMPATÍVEL
-    str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
+    # 1. Tentar obter o valor numérico
+    if isinstance(valor, (float, int, np.number)):
+        # Se já é um número (como o resultado de .sum()), use-o diretamente.
+        num_valor = float(valor)
+    else:
+        # Se é uma string (dado bruto do CSV), limpar e converter.
+        str_valor = str(valor).strip()
+        # Limpeza de Símbolos Sequencial
+        str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
 
-    # 1.1 Limpeza e conversão de formato BR para float: 
-    # R$ 1.234.567,89 -> "1.234.567,89" -> "1234567.89" -> 1234567.89
+        try:
+            # Lógica de conversão BR (vírgula decimal) para Float (ponto decimal)
+            str_float = str_limpa.replace('.', 'TEMP').replace(',', '.').replace('TEMP', '')
+            num_valor = float(str_float)
+        except Exception:
+            # Se a string não puder ser convertida, retorna o valor de erro
+            return "-"
+
+    # 2. Formatação (Garantido que num_valor é um float aqui)
     try:
-        # A lógica é transformar a string BR em um float Python.
-        str_float = str_limpa.replace('.', 'TEMP').replace(',', '.').replace('TEMP', '')
-        num_valor = float(str_float)
-
-        # 2. Formatação
         if formato == 'moeda':
             # Formata o float (ex: 1234567.89) para R$ 1.234.567,89
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
@@ -41,10 +52,9 @@ def converter_e_formatar(valor, formato):
             return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         else:
             return str(num_valor)
-            
     except Exception:
-        # Se a conversão falhar (ex: célula vazia ou com erro), retorna '-'
         return "-"
+
 
 # ----------------------------------------------------
 # 1. Widget de Upload (na Sidebar)
@@ -69,34 +79,35 @@ if uploaded_file is not None:
     
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # Lendo o CSV SEM FORÇAR NENHUM TIPO
+            # Lendo o CSV SEM FORÇAR NENHUM TIPO (Todos como string)
             df = pd.read_csv(uploaded_file, delimiter=";")
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1].copy()
             
-            # --- Conversão para DataFrame de TRABALHO (apenas para filtros e gráficos) ---
+            # --- Conversão para DataFrame de TRABALHO (df_float) ---
             
-            # Colunas que precisam ser FLOAT para somas/filtros/gráficos
             colunas_para_float = [
                 "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
 
-            # Cria um DataFrame de trabalho temporário (df_float) para cálculos
             df_float = df.copy()
             
             # Aplica a limpeza e conversão de formato BR para float em todas as colunas numéricas
             for col in colunas_para_float:
                 if col in df_float.columns:
-                    str_series = df_float[col].astype(str).str.strip()
-                    
-                    # CORREÇÃO: Limpeza de Símbolos Sequencial (Compatível com Pandas antigo)
-                    str_series = str_series.str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
+                    # O tratamento BR->Float está na função converter_e_formatar, mas o Pandas é mais rápido
+                    # Limpa símbolos
+                    str_series = df_float[col].astype(str).str.strip().str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
 
                     # Lógica de conversão BR para Float (sem regex)
-                    str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
+                    # É NECESSÁRIO forçar regex=False em algumas versões
+                    try:
+                        str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
+                    except TypeError:
+                        str_limpa = str_series.str.replace('.', 'TEMP').str.replace(',', '.').str.replace('TEMP', '') # fallback
                     
                     df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
@@ -125,7 +136,7 @@ if uploaded_file is not None:
             filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
             
-            # Filtrado para exibição (DF_FILTRADO)
+            # Filtrado para exibição (DF_FILTRADO_EXIBICAO)
             df_filtrado_exibicao = df[filtro_status & filtro_entes]
             # Filtrado para cálculos (DF_FLOAT_FILTRADO)
             df_filtrado_calculo = df_float[filtro_status & filtro_entes]
@@ -141,7 +152,7 @@ if uploaded_file is not None:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # USANDO O DF DE CÁLCULO (DF_FLOAT_FILTRADO)
+                # USANDO O DF DE CÁLCULO (DF_FLOAT_FILTRADO) PARA SOMAS CORRETAS
                 total_divida = df_filtrado_calculo["ENDIVIDAMENTO TOTAL"].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
@@ -151,6 +162,7 @@ if uploaded_file is not None:
                 
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
+                # A função agora recebe um float e formata corretamente
                 with col_divida:
                     st.metric(label="Endividamento Total (R$)", value=converter_e_formatar(total_divida, 'moeda'))
                 with col_aportes:
@@ -168,15 +180,14 @@ if uploaded_file is not None:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                # ORDENAÇÃO USANDO O DF DE CÁLCULO
-                # Garante que a ordenação seja numérica
+                # ORDENAÇÃO USANDO O DF DE CÁLCULO (garante ordem numérica correta)
                 df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 
-                # SELECIONA AS LINHAS ORDENADAS NO DF DE EXIBIÇÃO (Que contém as strings originais)
+                # SELECIONA AS LINHAS ORDENADAS NO DF DE EXIBIÇÃO (DF_FILTRADO_EXIBICAO)
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                 df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
                 
-                # APLICA FORMATO (converter_e_formatar agora pega a string original e converte para exibir)
+                # APLICA FORMATO (recebendo a STRING ORIGINAL do DF de exibição)
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
@@ -223,7 +234,6 @@ if uploaded_file is not None:
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
-            # Esta linha está aqui para capturar qualquer outro erro que possa surgir.
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto (separador ';'). Detalhes: {e}")
 
 else:
