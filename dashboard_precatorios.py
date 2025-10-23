@@ -87,8 +87,9 @@ if uploaded_file is not None:
             
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             
+            # ADICIONANDO 'PARCELA ANUAL' AQUI
             colunas_para_float = [
-                "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
+                "ENDIVIDAMENTO TOTAL", "PARCELA ANUAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
@@ -103,7 +104,6 @@ if uploaded_file is not None:
                     str_series = df_float[col].astype(str).str.strip().str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
 
                     # Lógica de conversão BR para Float (sem regex)
-                    # É NECESSÁRIO forçar regex=False em algumas versões
                     try:
                         str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                     except TypeError:
@@ -112,7 +112,8 @@ if uploaded_file is not None:
                     df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
-            colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
+            # Verificação crítica de colunas. Adicionando PARCELA ANUAL na verificação.
+            colunas_criticas = ["ENTE", "STATUS", "PARCELA ANUAL", "APORTES"]
             if not all(col in df_float.columns for col in colunas_criticas):
                  st.error(f"Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique o cabeçalho.")
                  st.stop()
@@ -152,19 +153,19 @@ if uploaded_file is not None:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # USANDO O DF DE CÁLCULO (DF_FLOAT_FILTRADO) PARA SOMAS CORRETAS
-                total_divida = df_filtrado_calculo["ENDIVIDAMENTO TOTAL"].sum()
+                # MODIFICADO: SUBSTITUINDO ENDIVIDAMENTO TOTAL POR PARCELA ANUAL
+                total_parcela_anual = df_filtrado_calculo["PARCELA ANUAL"].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
                 num_entes = df_filtrado_calculo["ENTE"].nunique()
 
-                col_entes, col_divida, col_aportes, col_saldo = st.columns(4)
+                col_entes, col_parcela_anual, col_aportes, col_saldo = st.columns(4)
                 
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
-                # A função agora recebe um float e formata corretamente
-                with col_divida:
-                    st.metric(label="Endividamento Total (R$)", value=converter_e_formatar(total_divida, 'moeda'))
+                # MODIFICADO: NOVO NOME E VALOR
+                with col_parcela_anual:
+                    st.metric(label="Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
                     st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
                 with col_saldo:
@@ -187,7 +188,7 @@ if uploaded_file is not None:
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                 df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
                 
-                # APLICA FORMATO (recebendo a STRING ORIGINAL do DF de exibição)
+                # APLICA FORMATO
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
@@ -206,13 +207,15 @@ if uploaded_file is not None:
                 
                 with tab1:
                     st.subheader("RCL e Percentuais por Tribunal")
-                    colunas_indices = ["ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+                    # ADICIONANDO PARCELA ANUAL À TABELA DE DETALHE
+                    colunas_indices = ["ENTE", "RCL 2024", "PARCELA ANUAL", "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
                     
                     df_indices = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                     df_indices_styled = df_indices[[col for col in colunas_indices if col in df_indices.columns]].copy()
                     
-                    if "RCL 2024" in df_indices_styled.columns:
-                        df_indices_styled["RCL 2024"] = df_indices_styled["RCL 2024"].apply(lambda x: converter_e_formatar(x, 'moeda'))
+                    for col in ["RCL 2024", "PARCELA ANUAL"]:
+                        if col in df_indices_styled.columns:
+                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                     
                     for col in ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]:
                         if col in df_indices_styled.columns:
