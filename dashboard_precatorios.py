@@ -57,16 +57,28 @@ if uploaded_file is not None:
             # --- CORREÇÃO: REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1]
             
-            # --- Limpeza e Conversão de Colunas Numéricas ---
+            # --- Limpeza e Conversão de Colunas Numéricas (Aprimorada) ---
             colunas_numericas = [
                 "ENDIVIDAMENTO TOTAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
+            
+            # Colunas de Percentual que precisam de atenção extra
+            colunas_percentual = ["DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
+            
             for col in colunas_numericas:
                 if col in df.columns:
-                    df[col] = (df[col].astype(str).str.replace(r'[R$\(\)]', '', regex=True) 
+                    # Tenta remover R$, %, parênteses, espaços e substitui vírgula por ponto.
+                    df[col] = (df[col].astype(str).str.replace(r'[R$\(\)%,]', '', regex=True) 
                         .str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.strip())
+                    
+                    # *NOVO: Para as colunas de percentual, o CSV pode já vir com o símbolo de %.*
+                    # *Tentamos remover o % na regex acima, mas vamos garantir que a conversão funcione.*
+                    if col in colunas_percentual:
+                         # Tenta remover qualquer caractere não numérico que tenha sobrado
+                        df[col] = df[col].astype(str).str.replace(r'[^0-9\.]', '', regex=True)
+
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                     
             colunas_criticas = ["ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES"]
@@ -105,7 +117,6 @@ if uploaded_file is not None:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # Os KPIs agora refletem apenas os entes (sem a linha Total)
                 total_divida = df_filtrado["ENDIVIDAMENTO TOTAL"].sum()
                 total_aportes = df_filtrado["APORTES"].sum()
                 saldo_a_pagar = df_filtrado["SALDO A PAGAR"].sum()
