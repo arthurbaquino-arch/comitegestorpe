@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import numpy as np # Necessário para identificar NaN
 
-# --- Configuração da página (Modo Escuro será aplicado se o tema do usuário for "Dark") ---
+# --- Configuração da página ---
 st.set_page_config(
     page_title="Dashboard de Precatórios - EC 136/2025",
     layout="wide",
@@ -62,6 +63,7 @@ if uploaded_file is not None:
                  st.stop()
                  
             df["ENTE"] = df["ENTE"].astype(str)
+            # A coluna STATUS deve ser tratada ANTES de criar a lista de filtros
             df["STATUS"] = df["STATUS"].astype(str)
                  
         except Exception as e:
@@ -74,23 +76,32 @@ if uploaded_file is not None:
         st.markdown("---")
         st.header("Filtros Analíticos")
         
-        entes_lista = df["ENTE"].unique().tolist()
-        status_lista = df["STATUS"].unique().tolist()
+        # CORREÇÃO PARA REMOVER 'nan' DOS FILTROS
+        # Usa dropna() para remover linhas que têm valor NaN no Status,
+        # mas apenas para a CRIAÇÃO da lista de filtros.
         
-        # FILTRO DE ENTE AGORA É LISTA SUSPENSA (st.selectbox)
+        # Filtra o DF APENAS para pegar os valores únicos não nulos da coluna STATUS
+        status_lista_limpa = df["STATUS"].dropna().unique().tolist()
+        
+        # O np.nan existe se a coluna for inicialmente lida como numérica.
+        # Filtra a lista para remover explicitamente o string 'nan' e NaN de Numpy
+        status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
+        
+        entes_lista = df["ENTE"].unique().tolist()
+        
+        # Filtro Selectbox Ente Devedor
         selected_ente = st.selectbox(
             "Ente Devedor:", 
-            options=["Todos"] + sorted(entes_lista) # Opção "Todos" + Entes em ordem alfabética
+            options=["Todos"] + sorted(entes_lista) 
         )
         
-        # Filtro Selectbox de Status
+        # Filtro Selectbox de Status (agora sem 'nan' na lista de opções)
         selected_status = st.selectbox(
             "Status da Dívida:", 
-            options=["Todos"] + status_lista
+            options=["Todos"] + sorted(status_lista)
         )
     
     # 4. Aplicação dos filtros
-    # Lógica de filtro para ENTE (se "Todos", filtra todos)
     filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
     filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
     
@@ -130,7 +141,7 @@ if uploaded_file is not None:
             color="STATUS",
             labels={"ENTE": "Ente Devedor", "ENDIVIDAMENTO TOTAL": "Endividamento Total (R$)"},
             height=500,
-            template="plotly_dark", # TEMA ESCURO
+            template="plotly_dark", 
             title="Endividamento Total por Ente (Ordem Decrescente)"
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -154,7 +165,7 @@ if uploaded_file is not None:
                 barmode="group",
                 labels={"ENTE": "Ente Devedor", "Valor Aportado": "Valor Aportado (R$)", "Tribunal": "Tribunal de Referência"},
                 height=500,
-                template="plotly_dark", # TEMA ESCURO
+                template="plotly_dark", 
                 title="Aportes Detalhados por Ente e Tribunal"
             )
             st.plotly_chart(fig_aportes, use_container_width=True)
