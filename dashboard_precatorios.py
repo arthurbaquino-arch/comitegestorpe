@@ -8,7 +8,9 @@ import os
 # CONFIGURAÇÃO DO ARQUIVO FIXO
 # ----------------------------------------------------
 # Mantenha o arquivo "Painel-Entes.csv" no mesmo diretório do seu script.
-FILE_PATH = "Painel-Entes.csv"
+FILE_PATH = "Painel Entes.csv"  # Verificando o nome exato do arquivo
+COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
+COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES"]
 
 
 # --- Configuração da página ---
@@ -74,10 +76,6 @@ st.markdown("---")
 # Processamento Condicional - AGORA LENDO DIRETAMENTE DO DISCO
 # ----------------------------------------------------
 
-# Define a coluna esperada para Parcela Anual
-COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
-
-
 # Verifica se o arquivo existe antes de tentar ler
 if not os.path.exists(FILE_PATH):
     st.error(f"❌ Erro: O arquivo de dados '{FILE_PATH}' não foi encontrado.")
@@ -85,18 +83,18 @@ if not os.path.exists(FILE_PATH):
 else:
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # 1. Lendo o CSV DIRETAMENTE DO DISCO
-            df = pd.read_csv(FILE_PATH, delimiter=";")
+            # 1. Lendo o CSV DIRETAMENTE DO DISCO COM ENCODING E FORÇANDO O CABEÇALHO
+            # Usando 'latin1' (ou 'ISO-8859-1') para lidar com caracteres especiais do português
+            df = pd.read_csv(FILE_PATH, delimiter=";", encoding='latin1', header=0)
             
             # --- CORREÇÃO CRÍTICA: Remove espaços em branco do início/fim dos nomes das colunas ---
             df.columns = df.columns.str.strip()
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
-            colunas_criticas = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES"]
             
-            if not all(col in df.columns for col in colunas_criticas):
+            if not all(col in df.columns for col in COLUNAS_CRITICAS):
                  # Se alguma coluna crítica não existir, exibe o erro e a lista de colunas.
-                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(colunas_criticas)}. Verifique a ortografia exata dos cabeçalhos.")
+                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(COLUNAS_CRITICAS)}. Verifique a ortografia exata dos cabeçalhos.")
                  st.info(f"Colunas disponíveis no arquivo (após limpeza de espaços): {', '.join(df.columns.tolist())}")
                  st.stop()
             
@@ -111,8 +109,7 @@ else:
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
             
-            # Remove duplicatas (apenas por segurança)
-            colunas_para_float = list(set(colunas_para_float)) 
+            colunas_para_float = list(set([col for col in colunas_para_float if col in df.columns]))
 
             df_float = df.copy()
             
@@ -176,7 +173,6 @@ else:
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
                 with col_parcela_anual:
-                    # Rótulo usa o nome da coluna para refletir o que está sendo usado
                     st.metric(label=f"Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
                     st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
@@ -249,5 +245,4 @@ else:
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
-            # Esta linha está aqui para capturar qualquer outro erro que possa surgir.
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Verifique se o formato do seu CSV está correto (separador ';'). Detalhes: {e}")
