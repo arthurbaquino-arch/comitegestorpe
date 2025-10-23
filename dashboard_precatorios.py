@@ -87,7 +87,6 @@ if uploaded_file is not None:
             
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             
-            # ADICIONANDO 'PARCELA ANUAL' AQUI
             colunas_para_float = [
                 "ENDIVIDAMENTO TOTAL", "PARCELA ANUAL", "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
@@ -104,6 +103,7 @@ if uploaded_file is not None:
                     str_series = df_float[col].astype(str).str.strip().str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
 
                     # Lógica de conversão BR para Float (sem regex)
+                    # É NECESSÁRIO forçar regex=False em algumas versões
                     try:
                         str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                     except TypeError:
@@ -153,7 +153,7 @@ if uploaded_file is not None:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # MODIFICADO: SUBSTITUINDO ENDIVIDAMENTO TOTAL POR PARCELA ANUAL
+                # USANDO O DF DE CÁLCULO (DF_FLOAT_FILTRADO) PARA SOMAS CORRETAS
                 total_parcela_anual = df_filtrado_calculo["PARCELA ANUAL"].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
@@ -163,7 +163,7 @@ if uploaded_file is not None:
                 
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
-                # MODIFICADO: NOVO NOME E VALOR
+                # A função agora recebe um float e formata corretamente
                 with col_parcela_anual:
                     st.metric(label="Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
@@ -174,7 +174,8 @@ if uploaded_file is not None:
                 st.markdown("---") 
 
                 # --- Seção 2: Tabela Principal (Resumo de Foco) ---
-                st.header("📋 Resumo da Situação por Ente (Foco Principal)")
+                # ALTERADO: REMOVIDO "(Foco Principal)" DO TÍTULO
+                st.header("📋 Resumo da Situação por Ente")
                 
                 colunas_resumo = [
                     "ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR",
@@ -188,7 +189,7 @@ if uploaded_file is not None:
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                 df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
                 
-                # APLICA FORMATO
+                # APLICA FORMATO (recebendo a STRING ORIGINAL do DF de exibição)
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
