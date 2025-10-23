@@ -25,15 +25,17 @@ st.set_page_config(
 # FUNÇÃO ROBUSTA DE LEITURA (PRESERVAÇÃO DO ARQUIVO)
 # ----------------------------------------------------
 def read_csv_robustly(file_path):
-    """Tenta ler o CSV usando múltiplos encodings."""
+    """Tenta ler o CSV usando múltiplos encodings e limpa cabeçalhos."""
     encodings = ['utf-8', 'latin1', 'cp1252']
     
     for encoding in encodings:
         try:
             # Tentar ler com o encoding atual
-            df = pd.read_csv(file_path, sep=";", encoding=encoding, header=0)
+            # Usando 'decimal=,' e 'thousands=.' aqui para que o Pandas tente fazer a conversão
+            # Se isso não funcionar, o código de limpeza abaixo fará o trabalho de força bruta.
+            df = pd.read_csv(file_path, sep=";", encoding=encoding, header=0, decimal=',', thousands='.', na_values=['#N/D', '#VALOR!', '-'])
             
-            # Limpeza e Renomeação Agressiva
+            # Limpeza e Renomeação Agressiva dos cabeçalhos
             col_map = {}
             for col in df.columns:
                 stripped_col = col.strip()
@@ -45,7 +47,6 @@ def read_csv_robustly(file_path):
                     stripped_col = stripped_col.lstrip('ï»¿').strip()
 
                 # 2. Corrige a codificação conhecida (DÃVIDA -> DÍVIDA)
-                # Isso cobre o caso em que o encoding não resolve a acentuação (ex: Latin1 lê 'DÃVIDA EM MORA / RCL')
                 if 'DÃVIDA EM MORA / RCL' in stripped_col:
                     stripped_col = 'DÍVIDA EM MORA / RCL'
 
@@ -59,7 +60,7 @@ def read_csv_robustly(file_path):
             continue
     
     # Se todas as tentativas falharem
-    raise Exception("Erro de Codificação Incurável. O arquivo contém caracteres que impedem a leitura. Tente salvá-lo como 'CSV UTF-8' no Excel/planilha.")
+    raise Exception("Erro de Codificação Incurável. O arquivo contém caracteres que impedem a leitura. Por favor, tente salvá-lo como 'CSV UTF-8' no Excel/planilha.")
 
 
 # ----------------------------------------------------
@@ -68,8 +69,10 @@ def read_csv_robustly(file_path):
 def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
     Formata um valor (string BR ou float) para o padrão monetário/percentual brasileiro.
+    A função espera receber um float ou NaN, ou uma string não numérica (ex: '-').
     """
-    if pd.isna(valor) or valor is None or valor == "":
+    # Se o valor já for NaN, None, ou 0, trata-o como '-'
+    if pd.isna(valor) or valor is None or (isinstance(valor, (float, int)) and valor == 0):
         return "-"
     
     num_valor = None
@@ -77,16 +80,24 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     if isinstance(valor, (float, int, np.number)):
         num_valor = float(valor)
     else:
+        # Tenta a conversão de strings (isso é redundante se o pd.read_csv funcionar, 
+        # mas mantém a compatibilidade caso a coluna tenha sido lida como object)
         str_valor = str(valor).strip()
         str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
 
         try:
+            # Converte formato BR (se a leitura do Pandas falhou)
             str_float = str_limpa.replace('.', 'TEMP', regex=False).replace(',', '.', regex=False).replace('TEMP', '', regex=False)
             num_valor = float(str_float)
         except Exception:
             return "-"
 
+    # Se o valor for muito pequeno e for arredondado para zero, exibe "-"
+    if abs(num_valor) < 0.01 and formato != 'percentual': 
+         return "-"
+         
     try:
+        # Formatação final para exibição
         if formato == 'moeda':
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         elif formato == 'percentual':
@@ -115,7 +126,7 @@ if not os.path.exists(FILE_PATH):
 else:
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # 1. Leitura do arquivo usando a função robusta
+            # 1. Leitura do arquivo usando a função robusta (tenta converter os floats na leitura)
             df = read_csv_robustly(FILE_PATH)
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
@@ -126,32 +137,31 @@ else:
                  st.stop()
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
+            # Assume que a última linha é uma totalização
             df = df.iloc[:-1].copy()
             
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
+            # df_float NÃO é mais necessário, pois a função read_csv_robustly
+            # já tentou converter os dados numéricos para float (ou NaN)
+            df_float = df.copy() 
             
-            colunas_para_float = [
+            # Garante que as colunas críticas de cálculo sejam numéricas
+            colunas_para_float_final = [
                 "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", "DÍVIDA EM MORA / RCL", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
             ]
             
-            colunas_para_float = list(set([col for col in colunas_para_float if col in df.columns]))
+            colunas_para_float_final = list(set([col for col in colunas_para_float_final if col in df_float.columns]))
 
-            df_float = df.copy()
-            
-            # Aplica a limpeza e conversão de formato BR para float em todas as colunas numéricas
-            for col in colunas_para_float:
-                if col in df_float.columns:
-                    str_series = df_float[col].astype(str).str.strip().str.replace('R$', '', regex=False).str.replace('(', '', regex=False).str.replace(')', '', regex=False).str.replace('%', '', regex=False).str.strip()
-                    try:
-                        str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
-                    except TypeError:
-                        str_limpa = str_series.str.replace('.', 'TEMP').str.replace(',', '.').str.replace('TEMP', '')
-                    
-                    df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
+            # Aplica conversão final para NaN em caso de falha, para garantir que os cálculos funcionem
+            # Esta é a camada de segurança que evita que strings não numéricas parem o cálculo
+            for col in colunas_para_float_final:
+                 # Tenta converter para numérico novamente, caso a leitura inicial tenha falhado em algumas linhas
+                 df_float[col] = pd.to_numeric(df_float[col], errors='coerce')
 
-                 
+
+            # Garante que as colunas de ENTE e STATUS sejam strings
             df["ENTE"] = df["ENTE"].astype(str)
             df["STATUS"] = df["STATUS"].astype(str)
             
@@ -166,10 +176,11 @@ else:
                 selected_ente = st.selectbox("👤 Ente Devedor:", options=["Todos"] + sorted(entes_lista))
                 selected_status = st.selectbox("🚦 Status da Dívida:", options=["Todos"] + sorted(status_lista))
             
-            # 4. Aplicação dos filtros no DataFrame original e no de cálculo
+            # 4. Aplicação dos filtros
             filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
             
+            # Filtra o dataframe original (para obter STATUS e ENTE) e o dataframe float (para cálculos)
             df_filtrado_exibicao = df[filtro_status & filtro_entes]
             df_filtrado_calculo = df_float[filtro_status & filtro_entes]
             
@@ -184,6 +195,7 @@ else:
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
+                # Calcula os totais do dataframe FLOAT
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL].sum()
                 total_aportes = df_filtrado_calculo["APORTES"].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
@@ -194,6 +206,7 @@ else:
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
                 with col_parcela_anual:
+                    # Usa a função de formatação no total (que é um float)
                     st.metric(label=f"Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
                     st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
@@ -211,16 +224,20 @@ else:
                 ]
                 
                 if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
+                    # Ordena pelo DF de cálculo (float)
                     df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 else:
                     df_resumo_float = df_filtrado_calculo 
 
                 
-                df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
-                df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
+                # Cria a tabela de exibição final, puxando os floats e formatando
+                df_exibicao_final = df_resumo_float.copy()
+                
+                df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
                 
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
+                        # Aplica a formatação em cada linha
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                         
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
@@ -235,12 +252,13 @@ else:
                 
                 tab1, tab2 = st.tabs(["📊 Índices Fiscais e RCL", "⚖️ Aportes Detalhados por Tribunal"])
                 
+                # A base para as abas é o df_exibicao_final (que é o df_float ordenado)
+                
                 with tab1:
                     st.subheader("RCL e Percentuais por Tribunal")
                     colunas_indices = ["ENTE", "RCL 2024", COLUNA_PARCELA_ANUAL, "DÍVIDA EM MORA / RCL", "% TJPE", "% TRF5", "% TRT6"]
                     
-                    df_indices = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
-                    df_indices_styled = df_indices[[col for col in colunas_indices if col in df_indices.columns]].copy()
+                    df_indices_styled = df_exibicao_final[[col for col in colunas_indices if col in df_exibicao_final.columns]].copy()
                     
                     for col in ["RCL 2024", COLUNA_PARCELA_ANUAL]:
                         if col in df_indices_styled.columns:
@@ -256,8 +274,7 @@ else:
                     st.subheader("Valores Aportados por Tribunal")
                     colunas_aportes = ["ENTE", "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]
                     
-                    df_aportes = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
-                    df_aportes_styled = df_aportes[[col for col in colunas_aportes if col in df_aportes.columns]].copy()
+                    df_aportes_styled = df_exibicao_final[[col for col in colunas_aportes if col in df_exibicao_final.columns]].copy()
                     
                     for col in ["APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]:
                         if col in df_aportes_styled.columns:
@@ -267,4 +284,4 @@ else:
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
-            st.warning("O problema de codificação persiste. Tente **remover a última linha do seu CSV** (que é a linha de Totalização) no seu programa de planilha e salve o arquivo antes de rodar o código novamente.")
+            st.warning("A leitura robusta falhou. Isso significa que há um erro na formatação do CSV (como linhas incompletas, quebras de linha no meio de campos, ou a linha de totalização interfere). Por favor, **abra o seu CSV e remova a última linha** (que é a linha de totalização) e tente rodar o script novamente.")
