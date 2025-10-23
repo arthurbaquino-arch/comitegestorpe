@@ -46,10 +46,8 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 
     try:
         if formato == 'moeda':
-            # Formata o float (ex: 1234567.89) para R$ 1.234.567,89
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         elif formato == 'percentual':
-            # Formata o float (ex: 0.41 ou 95) para 0,41% ou 95,00%
             return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         else:
             return str(num_valor)
@@ -75,22 +73,26 @@ if not os.path.exists(FILE_PATH):
 else:
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # 1. Lendo o CSV: Usando ENCODING='latin1' e forçando HEADER=0 para compatibilidade
+            # 1. Lendo o CSV: Usando ENCODING='latin1' para maior compatibilidade com arquivos BR
             df = pd.read_csv(FILE_PATH, delimiter=";", encoding='latin1', header=0)
             
-            # --- CORREÇÃO CRÍTICA: Remove o caractere BOM (ï»¿) ---
-            # Este passo resolve o erro específico com a coluna 'ENTE'
+            # --- CORREÇÃO CRÍTICA 1: Remove o caractere BOM (Byte Order Mark - \ufeff ou ï»¿) ---
             df.columns = df.columns.str.replace('\ufeff', '', regex=False)
             
-            # --- CORREÇÃO SECUNDÁRIA: Remove espaços em branco do início/fim dos nomes das colunas ---
+            # --- CORREÇÃO CRÍTICA 2: Remove espaços em branco do início/fim dos nomes das colunas ---
             df.columns = df.columns.str.strip()
+
+            # --- CORREÇÃO CRÍTICA 3: Força a correção de nomes de colunas que vieram com erro de codificação (DÃVIDA) ---
+            # O nome da coluna pode ter sido lido de forma diferente, então corrigimos o alvo.
+            df.columns = df.columns.str.replace('DÃVIDA EM MORA / RCL', 'DÍVIDA EM MORA / RCL', regex=False)
+            
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
             
             if not all(col in df.columns for col in COLUNAS_CRITICAS):
                  # Se alguma coluna crítica não existir, exibe o erro e a lista de colunas.
                  st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(COLUNAS_CRITICAS)}. Verifique a ortografia exata dos cabeçalhos.")
-                 st.info(f"Colunas disponíveis no arquivo (após limpeza de espaços): {', '.join(df.columns.tolist())}")
+                 st.info(f"Colunas disponíveis no arquivo (após correção de BOM/espaços): {', '.join(df.columns.tolist())}")
                  st.stop()
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
@@ -178,7 +180,12 @@ else:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
+                # Certifique-se de que a coluna "ENDIVIDAMENTO TOTAL" existe antes de ordenar
+                if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
+                    df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
+                else:
+                    df_resumo_float = df_filtrado_calculo # Não ordena se não tiver a coluna
+
                 
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                 df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
