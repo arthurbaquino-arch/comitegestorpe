@@ -63,13 +63,12 @@ def read_csv_robustly(file_path):
 
 
 # ----------------------------------------------------
-# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO (Mantida e Corrigida para %)
+# FUNÇÃO DE FORMATAÇÃO E CONVERSÃO
 # ----------------------------------------------------
 def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
     Formata um valor (float ou string) para o padrão monetário/percentual brasileiro.
     """
-    # Se o valor for NaN ou None, retorna "-"
     if pd.isna(valor) or valor is None:
         return "-"
     
@@ -78,27 +77,22 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     if isinstance(valor, (float, int, np.number)):
         num_valor = float(valor)
     else:
-        # Lógica de conversão de strings (se o Pandas não conseguiu na leitura)
         str_valor = str(valor).strip()
         str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
 
         try:
-            # Converte formato BR (ponto milhar, vírgula decimal) para Float (ponto decimal)
             str_float = str_limpa.replace('.', 'TEMP', regex=False).replace(',', '.', regex=False).replace('TEMP', '', regex=False)
             num_valor = float(str_float)
         except Exception:
-            return "-" # Retorna '-' se não for conversível
+            return "-" 
             
     try:
-        # Formatação final para exibição
         if formato == 'moeda':
-            # Verifica se é zero, e se for, retorna "-" (regra de negócio para moeda)
             if num_valor == 0 or abs(num_valor) < 0.01:
                 return "-"
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
         elif formato == 'percentual':
-            # Formata o percentual. Se for zero, aparecerá 0,00%
             return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
         else:
@@ -109,21 +103,17 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 
 
 # ----------------------------------------------------
-# TÍTULOS E LAYOUT INICIAL (ALTERADO)
+# TÍTULOS E LAYOUT INICIAL
 # ----------------------------------------------------
 st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
-
-# Novo Subtítulo em negrito e com os comitês abaixo
 st.markdown("<h3>Comitê Gestor</h3>", unsafe_allow_html=True)
 st.markdown("TJPE - TRF5 - TRT6")
-
 st.markdown("---") 
 
 # ----------------------------------------------------
 # Processamento
 # ----------------------------------------------------
 
-# Verifica se o arquivo existe antes de tentar ler
 if not os.path.exists(FILE_PATH):
     st.error(f"❌ Erro: O arquivo de dados '{FILE_PATH}' não foi encontrado.")
     st.info("Para que este código funcione, garanta que o arquivo CSV (`Painel Entes.csv`) esteja no mesmo diretório do script.")
@@ -134,10 +124,8 @@ else:
             df = read_csv_robustly(FILE_PATH)
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
-            
             if not all(col in df.columns for col in COLUNAS_CRITICAS):
-                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(COLUNAS_CRITICAS)}. Verifique a ortografia exata dos cabeçalhos.")
-                 st.info(f"Colunas disponíveis no arquivo (após limpeza): {', '.join(df.columns.tolist())}")
+                 st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(COLUNAS_CRITICAS)}. Colunas encontradas: {', '.join(df.columns.tolist())}")
                  st.stop()
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
@@ -157,10 +145,8 @@ else:
 
             # Aplica conversão forçada de string para float para todas as colunas numéricas
             for col in colunas_para_float_final:
-                 # Usa a mesma lógica de limpeza da função converter_e_formatar
                  str_series = df_float[col].astype(str).str.strip().str.replace('R$', '', regex=False).str.replace('(', '', regex=False).str.replace(')', '', regex=False).str.replace('%', '', regex=False).str.strip()
                  str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
-                 
                  df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
@@ -241,22 +227,32 @@ else:
                 
                 st.markdown("---")
 
-                # --- Seção 3: Detalhes Técnicos (Abas) ---
+                # --- Seção 3: Detalhes Técnicos (Três Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
                 
-                tab1, tab2 = st.tabs(["📊 Índices Fiscais e RCL", "⚖️ Aportes Detalhados por Tribunal"])
+                # ALTERAÇÃO: Criando 3 abas
+                tab1, tab2, tab3 = st.tabs([
+                    "📊 Índices Fiscais e RCL", 
+                    "⚖️ Aportes Detalhados",
+                    "⚖️ Rateio por Tribunal" # Nova aba
+                ])
                 
                 with tab1:
-                    st.subheader("RCL e Percentuais por Tribunal")
-                    colunas_indices = ["ENTE", "RCL 2024", COLUNA_PARCELA_ANUAL, "DÍVIDA EM MORA / RCL", "% APLICADO", "% TJPE", "% TRF5", "% TRT6"]
+                    st.subheader("RCL e Parcela Anual")
+                    
+                    # ALTERAÇÃO: Nova ordem das colunas
+                    colunas_indices = [
+                        "ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% APLICADO", COLUNA_PARCELA_ANUAL
+                    ]
                     
                     df_indices_styled = df_exibicao_final[[col for col in colunas_indices if col in df_exibicao_final.columns]].copy()
                     
+                    # Formatação
                     for col in ["RCL 2024", COLUNA_PARCELA_ANUAL]:
                         if col in df_indices_styled.columns:
                             df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                     
-                    for col in ["DÍVIDA EM MORA / RCL", "% APLICADO", "% TJPE", "% TRF5", "% TRT6"]:
+                    for col in ["DÍVIDA EM MORA / RCL", "% APLICADO"]:
                         if col in df_indices_styled.columns:
                             df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
                         
@@ -264,6 +260,7 @@ else:
 
                 with tab2:
                     st.subheader("Valores Aportados por Tribunal")
+                    
                     colunas_aportes = ["ENTE", "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]
                     
                     df_aportes_styled = df_exibicao_final[[col for col in colunas_aportes if col in df_exibicao_final.columns]].copy()
@@ -273,6 +270,20 @@ else:
                              df_aportes_styled[col] = df_aportes_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
 
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
+                
+                with tab3:
+                    st.subheader("Percentuais de Rateio por Tribunal")
+                    
+                    # NOVA ABA: Rateio por Tribunal
+                    colunas_rateio = ["ENTE", "% TJPE", "% TRF5", "% TRT6"]
+                    
+                    df_rateio_styled = df_exibicao_final[[col for col in colunas_rateio if col in df_exibicao_final.columns]].copy()
+                    
+                    for col in ["% TJPE", "% TRF5", "% TRT6"]:
+                        if col in df_rateio_styled.columns:
+                            df_rateio_styled[col] = df_rateio_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
+                        
+                    st.dataframe(df_rateio_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
