@@ -10,8 +10,8 @@ import os
 # ⚠️ GARANTA que o arquivo 'Painel Entes.csv' esteja no MESMO DIRETÓRIO do script.
 FILE_PATH = "Painel Entes.csv"
 COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
-COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES"]
-
+COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES", "DÍVIDA EM MORA / RCL"] 
+# Adicionei 'DÍVIDA EM MORA / RCL' às críticas para garantir a checagem após a renomeação
 
 # --- Configuração da página ---
 st.set_page_config(
@@ -74,24 +74,28 @@ if not os.path.exists(FILE_PATH):
 else:
     with st.spinner('⏳ Carregando e processando os indicadores...'):
         try:
-            # 1. Lendo o CSV: Usando ENCODING='latin1' para maior compatibilidade com arquivos BR
-            df = pd.read_csv(FILE_PATH, delimiter=";", encoding='latin1', header=0)
+            # 1. Lendo o CSV: Usando ENCODING='cp1252' (muitas vezes resolve a acentuação do Windows)
+            df = pd.read_csv(FILE_PATH, sep=";", encoding='cp1252', header=0)
             
             # --- CORREÇÃO CRÍTICA 1: Força o nome 'ENTE' removendo o caractere BOM persistente ---
-            # Verifica se a coluna problemática existe e a renomeia.
-            if 'ï»¿ENTE' in df.columns:
-                df.rename(columns={'ï»¿ENTE': 'ENTE'}, inplace=True)
-            # Se for lido com UTF-8, o caractere BOM é '\ufeff'
-            elif '\ufeffENTE' in df.columns:
-                 df.rename(columns={'\ufeffENTE': 'ENTE'}, inplace=True)
-
-            # --- CORREÇÃO CRÍTICA 2: Remove espaços em branco do início/fim dos nomes das colunas ---
-            df.columns = df.columns.str.strip()
+            # O caractere BOM pode ser lido como 'ï»¿' (latin1) ou '\ufeff' (UTF-8)
+            col_map = {}
+            for col in df.columns:
+                stripped_col = col.strip()
+                # 1. Remove o caractere BOM (se existir)
+                if stripped_col.startswith('\ufeff'):
+                    stripped_col = stripped_col.lstrip('\ufeff')
+                if stripped_col.startswith('ï»¿'):
+                    stripped_col = stripped_col.lstrip('ï»¿')
+                # 2. Remove espaços extras e adiciona ao mapeamento
+                col_map[col] = stripped_col.strip()
+            
+            df.rename(columns=col_map, inplace=True)
             
             # --- VERIFICAÇÃO CRÍTICA MÍNIMA ---
             
             if not all(col in df.columns for col in COLUNAS_CRITICAS):
-                 # Se alguma coluna crítica não existir, exibe o erro e a lista de colunas.
+                 # Este bloco só será acionado se houver um erro futuro.
                  st.error(f"❌ Erro: O arquivo CSV deve conter as colunas críticas: {', '.join(COLUNAS_CRITICAS)}. Verifique a ortografia exata dos cabeçalhos.")
                  st.info(f"Colunas disponíveis no arquivo (após correção de BOM/espaços): {', '.join(df.columns.tolist())}")
                  st.stop()
@@ -114,10 +118,13 @@ else:
             # Aplica a limpeza e conversão de formato BR para float em todas as colunas numéricas
             for col in colunas_para_float:
                 if col in df_float.columns:
-                    str_series = df_float[col].astype(str).str.strip().str.replace('R$', '').str.replace('(', '').str.replace(')', '').str.replace('%', '').str.strip()
+                    # Remove caracteres não numéricos e trata o formato BR (vírgula decimal)
+                    str_series = df_float[col].astype(str).str.strip().str.replace('R$', '', regex=False).str.replace('(', '', regex=False).str.replace(')', '', regex=False).str.replace('%', '', regex=False).str.strip()
                     try:
+                        # Substitui ponto por nada (separador de milhar) e vírgula por ponto (separador decimal)
                         str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                     except TypeError:
+                        # Fallback se houver algum erro de tipo
                         str_limpa = str_series.str.replace('.', 'TEMP').str.replace(',', '.').str.replace('TEMP', '')
                     
                     df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
@@ -181,16 +188,17 @@ else:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
+                # A coluna "ENDIVIDAMENTO TOTAL" é usada para ordenação
                 if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
-                    # Tenta ordenar apenas se a coluna de ordenação existir
                     df_resumo_float = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 else:
                     df_resumo_float = df_filtrado_calculo 
 
-                
+                # Garante que as linhas da exibição sigam a ordem da ordenação
                 df_resumo = df_filtrado_exibicao.set_index('ENTE').loc[df_resumo_float['ENTE']].reset_index()
                 df_resumo_styled = df_resumo[[col for col in colunas_resumo if col in df_resumo.columns]].copy()
                 
+                # Formatação das colunas monetárias e percentuais
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
@@ -239,4 +247,4 @@ else:
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
-            st.warning("Se o erro persistir, pode haver um problema na estrutura de alguma coluna do seu novo CSV.")
+            st.warning("Se o erro persistir, pode haver um problema na estrutura de alguma coluna do seu CSV. Tente salvar o arquivo CSV com codificação `UTF-8` no seu programa de planilha e tente novamente.")
