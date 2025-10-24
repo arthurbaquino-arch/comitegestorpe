@@ -110,7 +110,8 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 # TÍTULOS E LAYOUT INICIAL
 # ----------------------------------------------------
 st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
-st.markdown("<h3>Comitê Gestor</h3>", unsafe_allow_html=True)
+# ALTERAÇÃO SOLICITADA: Subtítulo
+st.markdown("<h3>Comitê Gestor de Precatórios - PE</h3>", unsafe_allow_html=True)
 st.markdown("TJPE - TRF5 - TRT6")
 st.markdown("---") 
 
