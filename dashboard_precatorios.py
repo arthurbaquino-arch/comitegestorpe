@@ -3,15 +3,17 @@ import pandas as pd
 import numpy as np 
 from typing import Union
 import os 
+import altair as alt # Importado para o gráfico Meta vs Realizado
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO
 # ----------------------------------------------------
 FILE_PATH = "Painel Entes.csv"
 COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
+COLUNA_APORTES = "APORTES" 
 
 # Colunas críticas esperadas no formato limpo
-COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES", "DÍVIDA EM MORA / RCL"]
+COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, COLUNA_APORTES, "DÍVIDA EM MORA / RCL"]
 
 
 # --- Configuração da página ---
@@ -22,7 +24,7 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# FUNÇÃO ROBUSTA DE LEITURA (PRESERVAÇÃO DO ARQUIVO)
+# FUNÇÃO ROBUSTA DE LEITURA 
 # ----------------------------------------------------
 def read_csv_robustly(file_path):
     """Tenta ler o CSV usando múltiplos encodings e limpa cabeçalhos."""
@@ -30,42 +32,33 @@ def read_csv_robustly(file_path):
     
     for encoding in encodings:
         try:
-            # Tentar ler com o encoding atual. 
             df = pd.read_csv(file_path, sep=";", encoding=encoding, header=0, na_values=['#N/D', '#VALOR!', '-'])
             
-            # Limpeza e Renomeação Agressiva dos cabeçalhos
             col_map = {}
             for col in df.columns:
                 stripped_col = col.strip()
-                
-                # 1. Remove o caractere BOM (\ufeff) e ï»¿
                 if stripped_col.startswith('\ufeff'):
                     stripped_col = stripped_col.lstrip('\ufeff').strip()
                 if stripped_col.startswith('ï»¿'):
                     stripped_col = stripped_col.lstrip('ï»¿').strip()
-
-                # 2. Corrige a codificação conhecida (DÃVIDA -> DÍVIDA)
                 if 'DÃVIDA EM MORA / RCL' in stripped_col:
                     stripped_col = 'DÍVIDA EM MORA / RCL'
                 
-                # 3. Garante que os nomes finais não tenham espaços desnecessários
                 col_map[col] = stripped_col.strip()
             
             df.rename(columns=col_map, inplace=True)
             return df
             
         except Exception:
-            # Se falhar, tenta o próximo encoding
             continue
     
-    # Se todas as tentativas falharem
     raise Exception("Erro de Codificação Incurável na leitura do CSV.")
 
 
 # ----------------------------------------------------
 # FUNÇÃO DE FORMATAÇÃO E CONVERSÃO
 # ----------------------------------------------------
-def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
+def converter_e_formatar(valor: Union[str, float, int, None], formato: str, delta=False):
     """
     Formata um valor (float ou string) para o padrão monetário/percentual brasileiro.
     """
@@ -88,13 +81,11 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
             
     try:
         if formato == 'moeda':
-            if num_valor == 0 or abs(num_valor) < 0.01:
+            if not delta and (num_valor == 0 or abs(num_valor) < 0.01):
                 return "-"
-            # Formatação monetária (ponto como milhar, vírgula como decimal)
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
         elif formato == 'percentual':
-            # Formatação percentual
             return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
         else:
@@ -103,14 +94,29 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     except Exception:
         return "-"
 
+# ----------------------------------------------------
+# FUNÇÃO DE ESTILIZAÇÃO DO PANDAS (NOVA)
+# ----------------------------------------------------
+def highlight_status(val):
+    """
+    Destaca a célula STATUS na tabela de resumo.
+    """
+    val_upper = str(val).upper().strip()
+    if 'ADIMPLENTE' in val_upper:
+        # Cor de fundo suave (Verde) e texto escuro
+        return 'background-color: #E6F7E6; color: #1E8449; font-weight: bold;'
+    elif 'INADIMPLENTE' in val_upper:
+        # Cor de fundo suave (Laranja/Vermelho) e texto escuro
+        return 'background-color: #FEEEEE; color: #C0392B; font-weight: bold;'
+    return '' # Estilo padrão
 
 # ----------------------------------------------------
-# TÍTULOS E LAYOUT INICIAL
+# TÍTULOS E LAYOUT INICIAL (MELHORADO)
 # ----------------------------------------------------
 st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
 st.markdown("<h3>Comitê Gestor</h3>", unsafe_allow_html=True)
 st.markdown("TJPE - TRF5 - TRT6")
-st.markdown("---") 
+st.divider() # <--- IMPLEMENTAÇÃO 1: DIVIDER
 
 # ----------------------------------------------------
 # Processamento
@@ -137,7 +143,7 @@ else:
             df_float = df.copy() 
             
             colunas_para_float_final = [
-                "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", 
+                "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, COLUNA_APORTES, "RCL 2024", 
                 "DÍVIDA EM MORA / RCL", "% APLICADO", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]",
@@ -146,19 +152,20 @@ else:
             
             colunas_para_float_final = list(set([col for col in colunas_para_float_final if col in df_float.columns]))
 
-            # Aplica conversão forçada de string para float para todas as colunas numéricas
             for col in colunas_para_float_final:
                  str_series = df_float[col].astype(str).str.strip().str.replace('R$', '', regex=False).str.replace('(', '', regex=False).str.replace(')', '', regex=False).str.replace('%', '', regex=False).str.strip()
                  str_limpa = str_series.str.replace('.', 'TEMP', regex=False).str.replace(',', '.', regex=False).str.replace('TEMP', '', regex=False)
                  df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
-            # Garante que as colunas de ENTE e STATUS sejam strings
             df["ENTE"] = df["ENTE"].astype(str)
             df["STATUS"] = df["STATUS"].astype(str)
             
             # --- Filtros (na Sidebar) ---
             with st.sidebar:
+                # <--- IMPLEMENTAÇÃO 3: LOGO/IMAGEM PLACEHOLDER
+                st.markdown("### Logo Comitê Gestor/EC 136")
+                st.markdown("---") 
                 st.header("⚙️ Filtros Analíticos")
                 
                 status_lista_limpa = df["STATUS"].dropna().unique().tolist()
@@ -182,20 +189,21 @@ else:
                 st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros na barra lateral.")
             else:
                 
-                # Ordena pelo DF de cálculo (float)
                 if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
                     df_exibicao_final = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
-                # --- Seção 1: Indicadores Chave (4 KPIs) ---
+                # --- Seção 1: Indicadores Chave (4 KPIs com Delta) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL].sum()
-                total_aportes = df_filtrado_calculo["APORTES"].sum()
+                total_aportes = df_filtrado_calculo[COLUNA_APORTES].sum()
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
                 num_entes = df_filtrado_calculo["ENTE"].nunique()
 
+                delta_aportes = total_aportes - total_parcela_anual
+                
                 col_entes, col_parcela_anual, col_aportes, col_saldo = st.columns(4)
                 
                 with col_entes:
@@ -203,11 +211,16 @@ else:
                 with col_parcela_anual:
                     st.metric(label=f"Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
-                    st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
+                    st.metric(
+                        label="Total de Aportes (R$)", 
+                        value=converter_e_formatar(total_aportes, 'moeda'),
+                        delta=converter_e_formatar(delta_aportes, 'moeda', delta=True),
+                        delta_color='normal' if delta_aportes >= 0 else 'inverse'
+                    )
                 with col_saldo:
                     st.metric(label="Saldo Remanescente a Pagar (R$)", value=converter_e_formatar(saldo_a_pagar, 'moeda'))
                 
-                st.markdown("---") 
+                st.divider()
 
                 # --- Seção 2: Tabela Principal (Resumo de Foco) ---
                 st.header("📋 Resumo da Situação por Ente")
@@ -217,8 +230,12 @@ else:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
+                # Cria o DF de exibição a partir do df_exibicao_final
+                df_resumo_raw = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
                 
+                # Cria a cópia do DF com formatação de moeda/percentual (para estilizar)
+                df_resumo_styled = df_resumo_raw.copy()
+
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
@@ -226,17 +243,27 @@ else:
                 if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
                     df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: converter_e_formatar(x, 'percentual'))
 
-                st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
+                # <--- IMPLEMENTAÇÃO 2: PANDAS STYLER
+                if "STATUS" in df_resumo_styled.columns:
+                    st.dataframe(
+                        df_resumo_styled.style.applymap(
+                            highlight_status, 
+                            subset=pd.IndexSlice[:, ['STATUS']]
+                        ), 
+                        use_container_width=True, 
+                        hide_index=True
+                    )
+                else:
+                    st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
                 
-                st.markdown("---")
+                st.divider()
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
                 
-                # ALTERAÇÃO: Mudança do emoji da aba de Aportes Detalhados para 📈
                 tab1, tab2, tab3, tab4 = st.tabs([
                     "📊 Índices Fiscais e RCL", 
-                    "📈 Aportes Detalhados", # Novo emoji
+                    "📈 Aportes Detalhados",
                     "⚖️ Rateio por Tribunal",
                     "💰 Composição da Dívida"
                 ])
@@ -250,7 +277,6 @@ else:
                     
                     df_indices_styled = df_exibicao_final[[col for col in colunas_indices if col in df_exibicao_final.columns]].copy()
                     
-                    # Formatação
                     for col in ["RCL 2024", COLUNA_PARCELA_ANUAL]:
                         if col in df_indices_styled.columns:
                             df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
@@ -261,7 +287,37 @@ else:
                         
                     st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
 
-                with tab2: # ABA APORTES DETALHADOS (Com Renomeação)
+                with tab2: # ABA APORTES DETALHADOS (Com Gráfico Meta vs. Realizado)
+                    st.subheader("Comparativo: Meta (Parcela Anual) vs. Realizado (Aportes)")
+                    
+                    # <--- IMPLEMENTAÇÃO 4: GRÁFICO META VS. REALIZADO
+                    df_chart = df_filtrado_calculo[["ENTE", COLUNA_PARCELA_ANUAL, COLUNA_APORTES]].copy()
+                    
+                    # Derretendo (melt) o DataFrame para o formato longo que o Altair espera
+                    df_chart_melted = df_chart.melt(
+                        id_vars='ENTE',
+                        value_vars=[COLUNA_PARCELA_ANUAL, COLUNA_APORTES],
+                        var_name='Tipo',
+                        value_name='Valor'
+                    )
+
+                    # Gráfico de Barras Empilhadas (ou lado a lado)
+                    chart = alt.Chart(df_chart_melted).mark_bar().encode(
+                        # Para melhor visualização, só mostramos o gráfico se houver mais de um ente
+                        x=alt.X('ENTE', sort='-y', title="Ente Devedor"),
+                        y=alt.Y('Valor', title="Valor (R$)"),
+                        color='Tipo',
+                        tooltip=['ENTE', 'Tipo', alt.Tooltip('Valor', format='$,.2f')]
+                    ).properties(
+                        height=400
+                    ).interactive() # Permite zoom e pan
+
+                    if num_entes > 0:
+                        st.altair_chart(chart, use_container_width=True)
+                    else:
+                        st.info("O gráfico 'Meta vs. Realizado' será exibido aqui ao selecionar um ou mais Entes Devedores.")
+
+                    st.markdown("---")
                     st.subheader("Valores Aportados por Tribunal")
                     
                     colunas_aportes_original = [
@@ -269,23 +325,19 @@ else:
                         "APORTES - [TJPE]", 
                         "APORTES - [TRF5]", 
                         "APORTES - [TRT6]",
-                        "APORTES" # Total
+                        COLUNA_APORTES # Total
                     ]
                     
-                    # Mapeamento para os novos nomes na exibição
                     colunas_renomeadas_aportes = {
                         "APORTES - [TJPE]": "TJPE", 
                         "APORTES - [TRF5]": "TRF5", 
                         "APORTES - [TRT6]": "TRT6",
-                        "APORTES": "TOTAL"
+                        COLUNA_APORTES: "TOTAL"
                     }
                     
                     df_aportes_styled = df_exibicao_final[[col for col in colunas_aportes_original if col in df_exibicao_final.columns]].copy()
-                    
-                    # Renomeia as colunas apenas para exibição nesta aba
                     df_aportes_styled.rename(columns=colunas_renomeadas_aportes, inplace=True)
                     
-                    # Lista de colunas a serem formatadas em moeda (os novos nomes)
                     colunas_moeda_aportes = ["TJPE", "TRF5", "TRT6", "TOTAL"]
                     
                     for col in colunas_moeda_aportes:
@@ -310,7 +362,6 @@ else:
                 with tab4: 
                     st.subheader("Endividamento Total por Tribunal")
                     
-                    # Colunas do DF original
                     colunas_divida_original = [
                         "ENTE", 
                         "ENDIVIDAMENTO TOTAL - [TJPE]", 
@@ -319,7 +370,6 @@ else:
                         "ENDIVIDAMENTO TOTAL"
                     ]
                     
-                    # Mapeamento para os novos nomes na exibição
                     colunas_renomeadas_divida = {
                         "ENDIVIDAMENTO TOTAL - [TJPE]": "TJPE", 
                         "ENDIVIDAMENTO TOTAL - [TRF5]": "TRF5", 
@@ -327,16 +377,11 @@ else:
                         "ENDIVIDAMENTO TOTAL": "TOTAL"
                     }
                     
-                    # Cria a cópia para estilizar e renomear
                     df_divida_styled = df_exibicao_final[[col for col in colunas_divida_original if col in df_exibicao_final.columns]].copy()
-                    
-                    # Renomeia as colunas apenas para exibição nesta aba
                     df_divida_styled.rename(columns=colunas_renomeadas_divida, inplace=True)
                     
-                    # Lista de colunas a serem formatadas em moeda (os novos nomes)
                     colunas_moeda_divida = ["TJPE", "TRF5", "TRT6", "TOTAL"]
 
-                    # Formatação em moeda
                     for col in colunas_moeda_divida:
                         if col in df_divida_styled.columns:
                              df_divida_styled[col] = df_divida_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
