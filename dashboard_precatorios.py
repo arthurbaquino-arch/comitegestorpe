@@ -9,6 +9,8 @@ import os
 # ----------------------------------------------------
 FILE_PATH = "Painel Entes.csv"
 COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
+# NOVO NOME DE COLUNA (DISPLAY E REFERÊNCIA INTERNA)
+COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY = "ENDIVIDAMENTO TOTAL em Jan/2025" 
 
 # Colunas críticas esperadas no formato limpo
 COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES", "DÍVIDA EM MORA / RCL"]
@@ -132,16 +134,27 @@ else:
             
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1].copy()
+
+            # --- RENOMEAR COLUNAS (SOLICITAÇÃO DO USUÁRIO) ---
+            rename_map = {
+                "ENDIVIDAMENTO TOTAL": COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY,
+                "ENDIVIDAMENTO TOTAL - [TJPE]": "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]",
+                "ENDIVIDAMENTO TOTAL - [TRF5]": "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]",
+                "ENDIVIDAMENTO TOTAL - [TRT6]": "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]",
+            }
+            # Aplica o rename no df (apenas se as colunas existirem, para não dar erro)
+            df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
             
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             df_float = df.copy() 
             
             colunas_para_float_final = [
-                "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", 
+                COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", 
                 "DÍVIDA EM MORA / RCL", "% APLICADO", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]",
-                "ENDIVIDAMENTO TOTAL - [TJPE]", "ENDIVIDAMENTO TOTAL - [TRF5]", "ENDIVIDAMENTO TOTAL - [TRT6]"
+                # Nomes atualizados para Endividamento Total
+                "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]"
             ]
             
             colunas_para_float_final = list(set([col for col in colunas_para_float_final if col in df_float.columns]))
@@ -183,8 +196,8 @@ else:
             else:
                 
                 # Ordena pelo DF de cálculo (float)
-                if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
-                    df_exibicao_final = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
+                if COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY in df_filtrado_calculo.columns:
+                    df_exibicao_final = df_filtrado_calculo.sort_values(by=COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, ascending=False)
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
@@ -203,7 +216,6 @@ else:
                 with col_parcela_anual:
                     st.metric(label=f"Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
-                    # ALTERAÇÃO: Rótulo atualizado conforme solicitação
                     st.metric(label="Total de Aportes em 2025 (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
                 with col_saldo:
                     st.metric(label="Saldo Remanescente a Pagar (R$)", value=converter_e_formatar(saldo_a_pagar, 'moeda'))
@@ -214,13 +226,13 @@ else:
                 st.header("📋 Resumo da Situação por Ente")
                 
                 colunas_resumo = [
-                    "ENTE", "STATUS", "ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR",
+                    "ENTE", "STATUS", COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, "APORTES", "SALDO A PAGAR",
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
                 df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
                 
-                for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
+                for col in [COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, "APORTES", "SALDO A PAGAR"]:
                     if col in df_resumo_styled.columns:
                         df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
                         
@@ -308,23 +320,23 @@ else:
                     st.dataframe(df_rateio_styled, use_container_width=True, hide_index=True)
 
                 with tab4: 
-                    st.subheader("Endividamento Total por Tribunal")
+                    st.subheader(COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY + " por Tribunal")
                     
-                    # Colunas do DF original
+                    # Colunas do DF original (agora com os nomes atualizados)
                     colunas_divida_original = [
                         "ENTE", 
-                        "ENDIVIDAMENTO TOTAL - [TJPE]", 
-                        "ENDIVIDAMENTO TOTAL - [TRF5]", 
-                        "ENDIVIDAMENTO TOTAL - [TRT6]", 
-                        "ENDIVIDAMENTO TOTAL"
+                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]", 
+                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]", 
+                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]", 
+                        COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY
                     ]
                     
-                    # Mapeamento para os novos nomes na exibição
+                    # Mapeamento para os novos nomes na exibição da tabela
                     colunas_renomeadas_divida = {
-                        "ENDIVIDAMENTO TOTAL - [TJPE]": "TJPE", 
-                        "ENDIVIDAMENTO TOTAL - [TRF5]": "TRF5", 
-                        "ENDIVIDAMENTO TOTAL - [TRT6]": "TRT6", 
-                        "ENDIVIDAMENTO TOTAL": "TOTAL"
+                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]": "TJPE", 
+                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]": "TRF5", 
+                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]": "TRT6", 
+                        COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY: "TOTAL"
                     }
                     
                     # Cria a cópia para estilizar e renomear
