@@ -220,4 +220,129 @@ else:
                 df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
                 
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
-                    if col in df_resumo_
+                    if col in df_resumo_styled.columns:
+                        df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
+                        
+                if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
+                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: converter_e_formatar(x, 'percentual'))
+
+                st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+
+                # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
+                st.header("🔎 Análise Detalhada de Índices e Aportes")
+                
+                # ALTERAÇÃO: Mudança do emoji da aba de Aportes Detalhados para 📈
+                tab1, tab2, tab3, tab4 = st.tabs([
+                    "📊 Índices Fiscais e RCL", 
+                    "📈 Aportes Detalhados", # Novo emoji
+                    "⚖️ Rateio por Tribunal",
+                    "💰 Composição da Dívida"
+                ])
+                
+                with tab1:
+                    st.subheader("RCL e Parcela Anual")
+                    
+                    colunas_indices = [
+                        "ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% APLICADO", COLUNA_PARCELA_ANUAL
+                    ]
+                    
+                    df_indices_styled = df_exibicao_final[[col for col in colunas_indices if col in df_exibicao_final.columns]].copy()
+                    
+                    # Formatação
+                    for col in ["RCL 2024", COLUNA_PARCELA_ANUAL]:
+                        if col in df_indices_styled.columns:
+                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
+                    
+                    for col in ["DÍVIDA EM MORA / RCL", "% APLICADO"]:
+                        if col in df_indices_styled.columns:
+                            df_indices_styled[col] = df_indices_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
+                        
+                    st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
+
+                with tab2: # ABA APORTES DETALHADOS (Com Renomeação)
+                    st.subheader("Valores Aportados por Tribunal")
+                    
+                    colunas_aportes_original = [
+                        "ENTE", 
+                        "APORTES - [TJPE]", 
+                        "APORTES - [TRF5]", 
+                        "APORTES - [TRT6]",
+                        "APORTES" # Total
+                    ]
+                    
+                    # Mapeamento para os novos nomes na exibição
+                    colunas_renomeadas_aportes = {
+                        "APORTES - [TJPE]": "TJPE", 
+                        "APORTES - [TRF5]": "TRF5", 
+                        "APORTES - [TRT6]": "TRT6",
+                        "APORTES": "TOTAL"
+                    }
+                    
+                    df_aportes_styled = df_exibicao_final[[col for col in colunas_aportes_original if col in df_exibicao_final.columns]].copy()
+                    
+                    # Renomeia as colunas apenas para exibição nesta aba
+                    df_aportes_styled.rename(columns=colunas_renomeadas_aportes, inplace=True)
+                    
+                    # Lista de colunas a serem formatadas em moeda (os novos nomes)
+                    colunas_moeda_aportes = ["TJPE", "TRF5", "TRT6", "TOTAL"]
+                    
+                    for col in colunas_moeda_aportes:
+                        if col in df_aportes_styled.columns:
+                             df_aportes_styled[col] = df_aportes_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
+
+                    st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
+                
+                with tab3:
+                    st.subheader("Percentuais de Rateio por Tribunal")
+                    
+                    colunas_rateio = ["ENTE", "% TJPE", "% TRF5", "% TRT6"]
+                    
+                    df_rateio_styled = df_exibicao_final[[col for col in colunas_rateio if col in df_exibicao_final.columns]].copy()
+                    
+                    for col in ["% TJPE", "% TRF5", "% TRT6"]:
+                        if col in df_rateio_styled.columns:
+                            df_rateio_styled[col] = df_rateio_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
+                        
+                    st.dataframe(df_rateio_styled, use_container_width=True, hide_index=True)
+
+                with tab4: 
+                    st.subheader("Endividamento Total por Tribunal")
+                    
+                    # Colunas do DF original
+                    colunas_divida_original = [
+                        "ENTE", 
+                        "ENDIVIDAMENTO TOTAL - [TJPE]", 
+                        "ENDIVIDAMENTO TOTAL - [TRF5]", 
+                        "ENDIVIDAMENTO TOTAL - [TRT6]", 
+                        "ENDIVIDAMENTO TOTAL"
+                    ]
+                    
+                    # Mapeamento para os novos nomes na exibição
+                    colunas_renomeadas_divida = {
+                        "ENDIVIDAMENTO TOTAL - [TJPE]": "TJPE", 
+                        "ENDIVIDAMENTO TOTAL - [TRF5]": "TRF5", 
+                        "ENDIVIDAMENTO TOTAL - [TRT6]": "TRT6", 
+                        "ENDIVIDAMENTO TOTAL": "TOTAL"
+                    }
+                    
+                    # Cria a cópia para estilizar e renomear
+                    df_divida_styled = df_exibicao_final[[col for col in colunas_divida_original if col in df_exibicao_final.columns]].copy()
+                    
+                    # Renomeia as colunas apenas para exibição nesta aba
+                    df_divida_styled.rename(columns=colunas_renomeadas_divida, inplace=True)
+                    
+                    # Lista de colunas a serem formatadas em moeda (os novos nomes)
+                    colunas_moeda_divida = ["TJPE", "TRF5", "TRT6", "TOTAL"]
+
+                    # Formatação em moeda
+                    for col in colunas_moeda_divida:
+                        if col in df_divida_styled.columns:
+                             df_divida_styled[col] = df_divida_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
+
+                    st.dataframe(df_divida_styled, use_container_width=True, hide_index=True)
+                
+        except Exception as e:
+            st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
+            st.warning("Verifique se o seu CSV possui problemas de formatação que impedem a leitura robusta, como quebras de linha ou caracteres ilegais.")
