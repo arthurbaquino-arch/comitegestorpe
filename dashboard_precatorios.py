@@ -203,7 +203,8 @@ else:
                 with col_parcela_anual:
                     st.metric(label=f"Parcela Anual (R$)", value=converter_e_formatar(total_parcela_anual, 'moeda'))
                 with col_aportes:
-                    st.metric(label="Total de Aportes (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
+                    # ALTERAÇÃO: Rótulo atualizado conforme solicitação
+                    st.metric(label="Total de Aportes em 2025 (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
                 with col_saldo:
                     st.metric(label="Saldo Remanescente a Pagar (R$)", value=converter_e_formatar(saldo_a_pagar, 'moeda'))
                 
@@ -233,10 +234,9 @@ else:
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
                 
-                # ALTERAÇÃO: Mudança do emoji da aba de Aportes Detalhados para 📈
                 tab1, tab2, tab3, tab4 = st.tabs([
                     "📊 Índices Fiscais e RCL", 
-                    "📈 Aportes Detalhados", # Novo emoji
+                    "📈 Aportes Detalhados",
                     "⚖️ Rateio por Tribunal",
                     "💰 Composição da Dívida"
                 ])
