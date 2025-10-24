@@ -233,9 +233,10 @@ else:
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
                 
+                # ALTERAÇÃO: Mudança do emoji da aba de Aportes Detalhados para 📈
                 tab1, tab2, tab3, tab4 = st.tabs([
                     "📊 Índices Fiscais e RCL", 
-                    "⚖️ Aportes Detalhados",
+                    "📈 Aportes Detalhados", # Novo emoji
                     "⚖️ Rateio por Tribunal",
                     "💰 Composição da Dívida"
                 ])
@@ -260,14 +261,34 @@ else:
                         
                     st.dataframe(df_indices_styled, use_container_width=True, hide_index=True)
 
-                with tab2:
+                with tab2: # ABA APORTES DETALHADOS (Com Renomeação)
                     st.subheader("Valores Aportados por Tribunal")
                     
-                    colunas_aportes = ["ENTE", "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]
+                    colunas_aportes_original = [
+                        "ENTE", 
+                        "APORTES - [TJPE]", 
+                        "APORTES - [TRF5]", 
+                        "APORTES - [TRT6]",
+                        "APORTES" # Total
+                    ]
                     
-                    df_aportes_styled = df_exibicao_final[[col for col in colunas_aportes if col in df_exibicao_final.columns]].copy()
+                    # Mapeamento para os novos nomes na exibição
+                    colunas_renomeadas_aportes = {
+                        "APORTES - [TJPE]": "TJPE", 
+                        "APORTES - [TRF5]": "TRF5", 
+                        "APORTES - [TRT6]": "TRT6",
+                        "APORTES": "TOTAL"
+                    }
                     
-                    for col in ["APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]"]:
+                    df_aportes_styled = df_exibicao_final[[col for col in colunas_aportes_original if col in df_exibicao_final.columns]].copy()
+                    
+                    # Renomeia as colunas apenas para exibição nesta aba
+                    df_aportes_styled.rename(columns=colunas_renomeadas_aportes, inplace=True)
+                    
+                    # Lista de colunas a serem formatadas em moeda (os novos nomes)
+                    colunas_moeda_aportes = ["TJPE", "TRF5", "TRT6", "TOTAL"]
+                    
+                    for col in colunas_moeda_aportes:
                         if col in df_aportes_styled.columns:
                              df_aportes_styled[col] = df_aportes_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
 
@@ -299,7 +320,7 @@ else:
                     ]
                     
                     # Mapeamento para os novos nomes na exibição
-                    colunas_renomeadas = {
+                    colunas_renomeadas_divida = {
                         "ENDIVIDAMENTO TOTAL - [TJPE]": "TJPE", 
                         "ENDIVIDAMENTO TOTAL - [TRF5]": "TRF5", 
                         "ENDIVIDAMENTO TOTAL - [TRT6]": "TRT6", 
@@ -310,13 +331,13 @@ else:
                     df_divida_styled = df_exibicao_final[[col for col in colunas_divida_original if col in df_exibicao_final.columns]].copy()
                     
                     # Renomeia as colunas apenas para exibição nesta aba
-                    df_divida_styled.rename(columns=colunas_renomeadas, inplace=True)
+                    df_divida_styled.rename(columns=colunas_renomeadas_divida, inplace=True)
                     
                     # Lista de colunas a serem formatadas em moeda (os novos nomes)
-                    colunas_moeda = ["TJPE", "TRF5", "TRT6", "TOTAL"]
+                    colunas_moeda_divida = ["TJPE", "TRF5", "TRT6", "TOTAL"]
 
                     # Formatação em moeda
-                    for col in colunas_moeda:
+                    for col in colunas_moeda_divida:
                         if col in df_divida_styled.columns:
                              df_divida_styled[col] = df_divida_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
 
