@@ -186,6 +186,8 @@ else:
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
             
             df_filtrado_calculo = df_float[filtro_status & filtro_entes]
+            # Usar o DF original para pegar o STATUS como string, se aplicável
+            df_filtrado_string = df[filtro_status & filtro_entes] 
             
             # ----------------------------------------------------
             # INÍCIO DO LAYOUT 1: FOCO E DETALHE
@@ -201,7 +203,7 @@ else:
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
-                # --- Seção 1: Indicadores Chave (4 KPIs) ---
+                # --- Seção 1: Indicadores Chave (5 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL].sum()
@@ -209,7 +211,19 @@ else:
                 saldo_a_pagar = df_filtrado_calculo["SALDO A PAGAR"].sum()
                 num_entes = df_filtrado_calculo["ENTE"].nunique()
 
-                col_entes, col_parcela_anual, col_aportes, col_saldo = st.columns(4)
+                # LÓGICA DO NOVO KPI "STATUS"
+                if selected_ente == "Todos":
+                    status_display = "-"
+                elif num_entes == 1 and "STATUS" in df_filtrado_string.columns:
+                    # Pega o primeiro (e único) status no resultado do filtro
+                    status_display = df_filtrado_string["STATUS"].iloc[0]
+                else:
+                    # Caso inesperado de mais de um ente com filtro de status, retorna "-"
+                    status_display = "-"
+
+
+                # Ajuste para 5 colunas
+                col_entes, col_parcela_anual, col_aportes, col_saldo, col_status = st.columns(5)
                 
                 with col_entes:
                     st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
@@ -219,6 +233,8 @@ else:
                     st.metric(label="Total de Aportes em 2025 (R$)", value=converter_e_formatar(total_aportes, 'moeda'))
                 with col_saldo:
                     st.metric(label="Saldo Remanescente a Pagar (R$)", value=converter_e_formatar(saldo_a_pagar, 'moeda'))
+                with col_status: # NOVO KPI
+                    st.metric(label="Status", value=status_display)
                 
                 st.markdown("---") 
 
