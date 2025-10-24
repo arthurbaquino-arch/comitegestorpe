@@ -90,9 +90,11 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
         if formato == 'moeda':
             if num_valor == 0 or abs(num_valor) < 0.01:
                 return "-"
+            # Formatação monetária (ponto como milhar, vírgula como decimal)
             return f"R$ {num_valor:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
         elif formato == 'percentual':
+            # Formatação percentual
             return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
         else:
@@ -138,7 +140,8 @@ else:
                 "ENDIVIDAMENTO TOTAL", COLUNA_PARCELA_ANUAL, "APORTES", "RCL 2024", 
                 "DÍVIDA EM MORA / RCL", "% APLICADO", 
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
-                "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]" 
+                "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]",
+                "ENDIVIDAMENTO TOTAL - [TJPE]", "ENDIVIDAMENTO TOTAL - [TRF5]", "ENDIVIDAMENTO TOTAL - [TRT6]" # Novas colunas
             ]
             
             colunas_para_float_final = list(set([col for col in colunas_para_float_final if col in df_float.columns]))
@@ -179,6 +182,12 @@ else:
                 st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros na barra lateral.")
             else:
                 
+                # Ordena pelo DF de cálculo (float)
+                if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
+                    df_exibicao_final = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
+                else:
+                    df_exibicao_final = df_filtrado_calculo 
+
                 # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
@@ -208,12 +217,6 @@ else:
                     "DÍVIDA EM MORA / RCL"
                 ]
                 
-                if "ENDIVIDAMENTO TOTAL" in df_filtrado_calculo.columns:
-                    df_exibicao_final = df_filtrado_calculo.sort_values(by="ENDIVIDAMENTO TOTAL", ascending=False)
-                else:
-                    df_exibicao_final = df_filtrado_calculo 
-
-                
                 df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
                 
                 for col in ["ENDIVIDAMENTO TOTAL", "APORTES", "SALDO A PAGAR"]:
@@ -227,20 +230,21 @@ else:
                 
                 st.markdown("---")
 
-                # --- Seção 3: Detalhes Técnicos (Três Abas) ---
+                # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
                 
-                # ALTERAÇÃO: Criando 3 abas
-                tab1, tab2, tab3 = st.tabs([
+                # ALTERAÇÃO: Criando 4 abas
+                tab1, tab2, tab3, tab4 = st.tabs([
                     "📊 Índices Fiscais e RCL", 
                     "⚖️ Aportes Detalhados",
-                    "⚖️ Rateio por Tribunal" # Nova aba
+                    "⚖️ Rateio por Tribunal",
+                    "💰 Composição da Dívida" # Nova aba
                 ])
                 
                 with tab1:
                     st.subheader("RCL e Parcela Anual")
                     
-                    # ALTERAÇÃO: Nova ordem das colunas
+                    # Ordem das colunas: ENTE, RCL 2024, DÍVIDA EM MORA / RCL, % APLICADO, PARCELA ANUAL
                     colunas_indices = [
                         "ENTE", "RCL 2024", "DÍVIDA EM MORA / RCL", "% APLICADO", COLUNA_PARCELA_ANUAL
                     ]
@@ -274,7 +278,6 @@ else:
                 with tab3:
                     st.subheader("Percentuais de Rateio por Tribunal")
                     
-                    # NOVA ABA: Rateio por Tribunal
                     colunas_rateio = ["ENTE", "% TJPE", "% TRF5", "% TRT6"]
                     
                     df_rateio_styled = df_exibicao_final[[col for col in colunas_rateio if col in df_exibicao_final.columns]].copy()
@@ -284,6 +287,26 @@ else:
                             df_rateio_styled[col] = df_rateio_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
                         
                     st.dataframe(df_rateio_styled, use_container_width=True, hide_index=True)
+
+                with tab4: # NOVA ABA
+                    st.subheader("Endividamento Total por Tribunal")
+                    
+                    colunas_divida = [
+                        "ENTE", 
+                        "ENDIVIDAMENTO TOTAL - [TJPE]", 
+                        "ENDIVIDAMENTO TOTAL - [TRF5]", 
+                        "ENDIVIDAMENTO TOTAL - [TRT6]", 
+                        "ENDIVIDAMENTO TOTAL"
+                    ]
+                    
+                    df_divida_styled = df_exibicao_final[[col for col in colunas_divida if col in df_exibicao_final.columns]].copy()
+                    
+                    # Formatação em moeda
+                    for col in colunas_divida[1:]: # Ignora 'ENTE'
+                        if col in df_divida_styled.columns:
+                             df_divida_styled[col] = df_divida_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
+
+                    st.dataframe(df_divida_styled, use_container_width=True, hide_index=True)
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
