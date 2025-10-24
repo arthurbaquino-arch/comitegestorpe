@@ -10,7 +10,7 @@ import os
 FILE_PATH = "Painel Entes.csv"
 COLUNA_PARCELA_ANUAL = "PARCELA ANUAL"
 # NOVO NOME DE COLUNA (DISPLAY E REFERÊNCIA INTERNA)
-COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY = "ENDIVIDAMENTO TOTAL em Jan/2025" 
+COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY = "ENDIVIDAMENTO TOTAL EM JAN/2025" 
 
 # Colunas críticas esperadas no formato limpo
 COLUNAS_CRITICAS = ["ENTE", "STATUS", COLUNA_PARCELA_ANUAL, "APORTES", "DÍVIDA EM MORA / RCL"]
@@ -138,9 +138,9 @@ else:
             # --- RENOMEAR COLUNAS (SOLICITAÇÃO DO USUÁRIO) ---
             rename_map = {
                 "ENDIVIDAMENTO TOTAL": COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY,
-                "ENDIVIDAMENTO TOTAL - [TJPE]": "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]",
-                "ENDIVIDAMENTO TOTAL - [TRF5]": "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]",
-                "ENDIVIDAMENTO TOTAL - [TRT6]": "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]",
+                "ENDIVIDAMENTO TOTAL - [TJPE]": "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]",
+                "ENDIVIDAMENTO TOTAL - [TRF5]": "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]",
+                "ENDIVIDAMENTO TOTAL - [TRT6]": "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
             }
             # Aplica o rename no df (apenas se as colunas existirem, para não dar erro)
             df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
@@ -154,7 +154,7 @@ else:
                 "SALDO A PAGAR", "% TJPE", "% TRF5", "% TRT6",
                 "APORTES - [TJPE]", "APORTES - [TRF5]", "APORTES - [TRT6]",
                 # Nomes atualizados para Endividamento Total
-                "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]"
+                "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]"
             ]
             
             colunas_para_float_final = list(set([col for col in colunas_para_float_final if col in df_float.columns]))
@@ -325,17 +325,17 @@ else:
                     # Colunas do DF original (agora com os nomes atualizados)
                     colunas_divida_original = [
                         "ENTE", 
-                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]", 
-                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]", 
-                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]", 
+                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", 
+                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", 
+                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]", 
                         COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY
                     ]
                     
                     # Mapeamento para os novos nomes na exibição da tabela
                     colunas_renomeadas_divida = {
-                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TJPE]": "TJPE", 
-                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRF5]": "TRF5", 
-                        "ENDIVIDAMENTO TOTAL em Jan/2025 - [TRT6]": "TRT6", 
+                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]": "TJPE", 
+                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]": "TRF5", 
+                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]": "TRT6", 
                         COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY: "TOTAL"
                     }
                     
