@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np 
 from typing import Union
 import os 
+import unicodedata # Importação necessária para ordenação correta
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO
@@ -22,6 +23,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ----------------------------------------------------
+# FUNÇÃO DE ORDENAÇÃO SEM ACENTOS
+# ----------------------------------------------------
+def sort_key_without_accents(text):
+    """Normaliza e converte para minúsculas, removendo acentos para ordenação alfabética correta."""
+    # NFKD separa caracteres acentuados (ex: 'Á' em 'A' e acento), 
+    # encode('ascii', 'ignore') remove o acento.
+    return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8').lower()
 
 # ----------------------------------------------------
 # FUNÇÃO ROBUSTA DE LEITURA (PRESERVAÇÃO DO ARQUIVO)
@@ -110,7 +120,6 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 # TÍTULOS E LAYOUT INICIAL
 # ----------------------------------------------------
 st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
-# ALTERAÇÃO SOLICITADA: Subtítulo
 st.markdown("<h3>Comitê Gestor de Precatórios - PE</h3>", unsafe_allow_html=True)
 st.markdown("TJPE - TRF5 - TRT6")
 st.markdown("---") 
@@ -167,8 +176,8 @@ else:
                  df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
-            # Garante que as colunas de ENTE e STATUS sejam strings
-            df["ENTE"] = df["ENTE"].astype(str)
+            # Garante que as colunas de ENTE e STATUS sejam strings e aplica limpeza
+            df["ENTE"] = df["ENTE"].astype(str).str.strip() 
             df["STATUS"] = df["STATUS"].astype(str)
             
             # --- Filtros (na Sidebar) ---
@@ -177,9 +186,14 @@ else:
                 
                 status_lista_limpa = df["STATUS"].dropna().unique().tolist()
                 status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
+                
+                # Extrai a lista de entes JÁ LIMPA para a ordenação correta
                 entes_lista = df["ENTE"].unique().tolist()
                 
-                selected_ente = st.selectbox("👤 Ente Devedor:", options=["Todos"] + sorted(entes_lista))
+                # APLICAÇÃO DA CHAVE DE ORDENAÇÃO SEM ACENTOS
+                selected_ente = st.selectbox("👤 Ente Devedor:", 
+                                             options=["Todos"] + sorted(entes_lista, key=sort_key_without_accents))
+                
                 selected_status = st.selectbox("🚦 Status da Dívida:", options=["Todos"] + sorted(status_lista))
             
             # 4. Aplicação dos filtros
