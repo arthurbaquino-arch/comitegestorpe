@@ -120,7 +120,8 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 # TÍTULOS E LAYOUT INICIAL
 # ----------------------------------------------------
 st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
-st.markdown("<h3>Comitê Gestor de Precatórios - PE</h3>", unsafe_allow_html=True)
+# Alteração da tag h3 para h2 para aumentar a fonte do subtítulo
+st.markdown("<h2>Comitê Gestor de Precatórios - PE</h2>", unsafe_allow_html=True) 
 st.markdown("TJPE - TRF5 - TRT6")
 st.markdown("---") 
 
@@ -252,8 +253,6 @@ else:
                     st.metric(label="Status", value=status_display)
                 
                 st.markdown("---") 
-
-                # A área "Resumo da Situação por Ente" foi removida.
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
