@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np 
 from typing import Union
 import os 
-import unicodedata # Importação necessária para ordenação correta
+import unicodedata 
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO
@@ -253,26 +253,7 @@ else:
                 
                 st.markdown("---") 
 
-                # --- Seção 2: Tabela Principal (Resumo de Foco) ---
-                st.header("📋 Resumo da Situação por Ente")
-                
-                colunas_resumo = [
-                    "ENTE", "STATUS", COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, "APORTES", "SALDO A PAGAR",
-                    "DÍVIDA EM MORA / RCL"
-                ]
-                
-                df_resumo_styled = df_exibicao_final[[col for col in colunas_resumo if col in df_exibicao_final.columns]].copy()
-                
-                for col in [COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, "APORTES", "SALDO A PAGAR"]:
-                    if col in df_resumo_styled.columns:
-                        df_resumo_styled[col] = df_resumo_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
-                        
-                if "DÍVIDA EM MORA / RCL" in df_resumo_styled.columns:
-                    df_resumo_styled["DÍVIDA EM MORA / RCL"] = df_resumo_styled["DÍVIDA EM MORA / RCL"].apply(lambda x: converter_e_formatar(x, 'percentual'))
-
-                st.dataframe(df_resumo_styled, use_container_width=True, hide_index=True)
-                
-                st.markdown("---")
+                # A área "Resumo da Situação por Ente" foi removida.
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
