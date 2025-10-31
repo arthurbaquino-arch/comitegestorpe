@@ -117,10 +117,10 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 
 
 # ----------------------------------------------------
-# TÍTULOS E LAYOUT INICIAL (ORDEM INVERTIDA)
+# TÍTULOS E LAYOUT INICIAL (COR DO TÍTULO ALTERADA)
 # ----------------------------------------------------
-# NOVO TÍTULO PRINCIPAL (H1, com a cor)
-st.markdown("<h1 style='color: #00BFFF;'>Comitê Gestor de Precatórios - PE</h1>", unsafe_allow_html=True)
+# NOVO TÍTULO PRINCIPAL (H1, com a cor AZUL MARINHO #000080)
+st.markdown("<h1 style='color: #000080;'>Comitê Gestor de Precatórios - PE</h1>", unsafe_allow_html=True)
 # SUBTÍTULO
 st.markdown("TJPE - TRF5 - TRT6")
 # TÍTULO SECUNDÁRIO (H2, o antigo H1)
