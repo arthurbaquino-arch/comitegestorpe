@@ -117,12 +117,14 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 
 
 # ----------------------------------------------------
-# TÍTULOS E LAYOUT INICIAL
+# TÍTULOS E LAYOUT INICIAL (ORDEM INVERTIDA)
 # ----------------------------------------------------
-st.markdown("<h1 style='color: #00BFFF;'>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h1>", unsafe_allow_html=True)
-# Alteração da tag h3 para h2 para aumentar a fonte do subtítulo
-st.markdown("<h2>Comitê Gestor de Precatórios - PE</h2>", unsafe_allow_html=True) 
+# NOVO TÍTULO PRINCIPAL (H1, com a cor)
+st.markdown("<h1 style='color: #00BFFF;'>Comitê Gestor de Precatórios - PE</h1>", unsafe_allow_html=True)
+# SUBTÍTULO
 st.markdown("TJPE - TRF5 - TRT6")
+# TÍTULO SECUNDÁRIO (H2, o antigo H1)
+st.markdown("<h2>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h2>", unsafe_allow_html=True)
 st.markdown("---") 
 
 # ----------------------------------------------------
