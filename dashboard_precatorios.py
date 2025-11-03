@@ -16,7 +16,7 @@ COLUNA_PARCELA_ANUAL_INTERNO = "TOTAL A SER APORTADO"
 COLUNA_APORTES_INTERNO = "VALOR APORTADO"
 COLUNA_SALDO_A_PAGAR_INTERNO = "SALDO REMANESCENTE A APORTAR"
 
-# Nomes de Colunas de Aportes Detalhados por Tribunal (Mantiveram o nome)
+# Nomes de Colunas de Aportes Detalhados por Tribunal 
 COLUNA_APORTES_TJPE_INTERNO = "APORTES - [TJPE]"
 COLUNA_APORTES_TRF5_INTERNO = "APORTES - [TRF5]"
 COLUNA_APORTES_TRT6_INTERNO = "APORTES - [TRT6]"
@@ -198,8 +198,8 @@ else:
                 COLUNA_SALDO_A_PAGAR_INTERNO, COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO,
                 # Colunas de Aportes/Endividamento/Rateio R$ por Tribunal
                 COLUNA_APORTES_TJPE_INTERNO, COLUNA_APORTES_TRF5_INTERNO, COLUNA_APORTES_TRT6_INTERNO, 
-                COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, # R$ (mantidas no mapeamento)
-                COLUNA_TJPE_SIMPLES_INTERNO, COLUNA_TRF5_SIMPLES_INTERNO, COLUNA_TRT6_SIMPLES_INTERNO, # Simples (USADAS NO NOVO KPI)
+                COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, # R$ 
+                COLUNA_TJPE_SIMPLES_INTERNO, COLUNA_TRF5_SIMPLES_INTERNO, COLUNA_TRT6_SIMPLES_INTERNO, # Simples
                 "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
                 # Colunas de Estoque
                 "ESTOQUE EM MORA - [TJPE]", "ESTOQUE VINCENDOS - [TJPE]",
@@ -223,7 +223,7 @@ else:
             
             # --- Filtros (na Sidebar) ---
             with st.sidebar:
-                st.header("⚙️ Filtros Analíticos")
+                st.header("⚙️ Filtros analíticos") # Formatação solicitada
                 
                 status_lista_limpa = df["STATUS"].dropna().unique().tolist()
                 status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
@@ -260,7 +260,7 @@ else:
                     df_exibicao_final = df_filtrado_calculo 
 
                 # --- Seção 1: Indicadores Chave (5 KPIs) ---
-                st.header("📈 Indicadores Consolidado (Total)")
+                st.header("📈 Indicadores consolidado (total)") # Formatação solicitada
                 
                 # USANDO OS NOMES INTERNOS CORRETOS DA PLANILHA
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
@@ -299,7 +299,7 @@ else:
                 st.markdown("---") 
 
                 # --- NOVA SEÇÃO DE KPI SOLICITADA (USANDO TJPE, TRF5, TRT6) ---
-                st.header("➡️ TOTAL A SER APORTADO PARA CADA TRIBUNAL")
+                st.header("➡️ Total a ser aportado para cada tribunal") # Formatação solicitada
                 
                 # Cálculo das somas dos novos KPIs (USANDO OS NOMES CORRETOS: TJPE, TRF5, TRT6)
                 total_tjpe_simples = df_filtrado_calculo[COLUNA_TJPE_SIMPLES_INTERNO].sum()
@@ -318,7 +318,7 @@ else:
                 st.markdown("---") 
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
-                st.header("🔎 Análise Detalhada de Índices e Aportes")
+                st.header("🔎 Análise detalhada de índices e aportes") # Formatação solicitada
                 
                 tab1, tab2, tab3, tab4 = st.tabs([
                     "📊 Índices Fiscais e RCL", 
