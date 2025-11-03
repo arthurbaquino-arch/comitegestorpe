@@ -7,34 +7,32 @@ import unicodedata
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
-# (CORRIGIDO PARA OS NOMES DA SUA ÚLTIMA PLANILHA)
+# (CORRIGIDO PARA OS NOMES DA SUA PLANILHA ATUAL NO SEU PC)
 # ----------------------------------------------------
 FILE_PATH = "Painel Entes.csv"
 
-# Nomes Internos (Baseados nos nomes exatos da planilha atual)
-COLUNA_PARCELA_ANUAL_INTERNO = "TOTAL A SER APORTADO"
-COLUNA_APORTES_INTERNO = "VALOR APORTADO"
-COLUNA_SALDO_A_PAGAR_INTERNO = "SALDO REMANESCENTE A APORTAR"
+# Nomes Internos (Baseados nos nomes exatos da planilha que está sendo lida)
+COLUNA_PARCELA_ANUAL_INTERNO = "PARCELA ANUAL"
+COLUNA_APORTES_INTERNO = "APORTES"
+COLUNA_SALDO_A_PAGAR_INTERNO = "SALDO A PAGAR"
 
 # Nomes de Colunas de Rateio por Tribunal
 COLUNA_APORTES_TJPE_INTERNO = "APORTES - [TJPE]"
 COLUNA_APORTES_TRF5_INTERNO = "APORTES - [TRF5]"
 COLUNA_APORTES_TRT6_INTERNO = "APORTES - [TRT6]"
 
-COLUNA_PERCENTUAL_TJPE_INTERNO = "TJPE (%)"
-COLUNA_PERCENTUAL_TRF5_INTERNO = "TRF5 (%)"
-COLUNA_PERCENTUAL_TRT6_INTERNO = "TRT6 (%)"
+COLUNA_PERCENTUAL_TJPE_INTERNO = "% TJPE"
+COLUNA_PERCENTUAL_TRF5_INTERNO = "% TRF5"
+COLUNA_PERCENTUAL_TRT6_INTERNO = "% TRT6"
 
-# NOVAS COLUNAS PARA A NOVA SEÇÃO DE KPIs
-COLUNA_TJPE_RS_INTERNO = "TJPE (R$)"
-COLUNA_TRF5_RS_INTERNO = "TRF5 (R$)"
-COLUNA_TRT6_RS_INTERNO = "TRT6 (R$)"
+# AS COLUNAS EM R$ (TJPE (R$), TRF5 (R$), TRT6 (R$)) FORAM REMOVIDAS
+# TEMPORARIAMENTE POIS NÃO ESTÃO NO ARQUIVO QUE O SEU CÓDIGO ESTÁ LENDO.
 
 # Nomes de Display (Para manter o visual anterior)
 COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY = "ENDIVIDAMENTO TOTAL EM JAN/2025" 
-COLUNA_PARCELA_ANUAL_DISPLAY = "Parcela Anual (R$)" # Display nome para TOTAL A SER APORTADO
-COLUNA_APORTES_DISPLAY = "Total de Aportes em 2025 (R$)" # Display nome para VALOR APORTADO
-COLUNA_SALDO_A_PAGAR_DISPLAY = "Saldo Remanescente a Pagar (R$)" # Display nome para SALDO REMANESCENTE A APORTAR
+COLUNA_PARCELA_ANUAL_DISPLAY = "Parcela Anual (R$)" 
+COLUNA_APORTES_DISPLAY = "Total de Aportes em 2025 (R$)" 
+COLUNA_SALDO_A_PAGAR_DISPLAY = "Saldo Remanescente a Pagar (R$)" 
 
 
 # Colunas críticas esperadas no formato limpo
@@ -185,14 +183,13 @@ else:
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             df_float = df.copy() 
             
-            # LISTA ATUALIZADA com base nos nomes internos da planilha atual
+            # LISTA ATUALIZADA com base nos nomes internos da planilha ATUALMENTE EM USO
             colunas_para_float_final = [
                 COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, COLUNA_PARCELA_ANUAL_INTERNO, COLUNA_APORTES_INTERNO, "RCL 2024", 
                 "DÍVIDA EM MORA / RCL", "% APLICADO", 
                 COLUNA_SALDO_A_PAGAR_INTERNO, COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO,
-                # Colunas de Aportes/Endividamento/Rateio R$ por Tribunal
+                # Colunas de Aportes/Endividamento por Tribunal
                 COLUNA_APORTES_TJPE_INTERNO, COLUNA_APORTES_TRF5_INTERNO, COLUNA_APORTES_TRT6_INTERNO, 
-                COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, 
                 "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
                 # Colunas de Estoque
                 "ESTOQUE EM MORA - [TJPE]", "ESTOQUE VINCENDOS - [TJPE]",
@@ -255,7 +252,7 @@ else:
                 # --- Seção 1: Indicadores Chave (5 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # USANDO OS NOMES INTERNOS ATUALIZADOS QUE ESTÃO NA PLANILHA
+                # USANDO OS NOMES INTERNOS QUE ESTÃO NA PLANILHA
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
                 total_aportes = df_filtrado_calculo[COLUNA_APORTES_INTERNO].sum()
                 saldo_a_pagar = df_filtrado_calculo[COLUNA_SALDO_A_PAGAR_INTERNO].sum()
@@ -291,24 +288,8 @@ else:
                 
                 st.markdown("---") 
 
-                # --- NOVA SEÇÃO DE KPI SOLICITADA ---
-                st.header("➡️ TOTAL A SER APORTADO PARA CADA TRIBUNAL")
-                
-                # Cálculo das somas dos novos KPIs (USANDO OS NOMES CORRETOS)
-                total_tjpe_rs = df_filtrado_calculo[COLUNA_TJPE_RS_INTERNO].sum()
-                total_trf5_rs = df_filtrado_calculo[COLUNA_TRF5_RS_INTERNO].sum()
-                total_trt6_rs = df_filtrado_calculo[COLUNA_TRT6_RS_INTERNO].sum()
-
-                col_tjpe, col_trf5, col_trt6 = st.columns(3)
-
-                with col_tjpe:
-                    st.metric(label="TJPE (R$)", value=converter_e_formatar(total_tjpe_rs, 'moeda'))
-                with col_trf5:
-                    st.metric(label="TRF5 (R$)", value=converter_e_formatar(total_trf5_rs, 'moeda'))
-                with col_trt6:
-                    st.metric(label="TRT6 (R$)", value=converter_e_formatar(total_trt6_rs, 'moeda'))
-                
-                st.markdown("---") 
+                # A NOVA SEÇÃO FOI OMITIDA AQUI. PARA INCLUÍ-LA, ADICIONE AS COLUNAS
+                # TJPE (R$), TRF5 (R$) E TRT6 (R$) NO SEU CSV.
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise Detalhada de Índices e Aportes")
@@ -353,7 +334,7 @@ else:
                         COLUNA_APORTES_TJPE_INTERNO, 
                         COLUNA_APORTES_TRF5_INTERNO, 
                         COLUNA_APORTES_TRT6_INTERNO,
-                        COLUNA_APORTES_INTERNO # Total (VALOR APORTADO)
+                        COLUNA_APORTES_INTERNO # Total (APORTES)
                     ]
                     
                     # Mapeamento para os nomes de exibição na tabela
