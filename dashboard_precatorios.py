@@ -7,7 +7,7 @@ import unicodedata
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
-# (FINAL: AJUSTADO PARA OS NOMES DA SUA PLANILHA MAIS RECENTE)
+# (FINAL: AJUSTADO PARA AS COLUNAS SIMPLES: TJPE, TRF5, TRT6)
 # ----------------------------------------------------
 FILE_PATH = "Painel Entes.csv"
 
@@ -21,15 +21,20 @@ COLUNA_APORTES_TJPE_INTERNO = "APORTES - [TJPE]"
 COLUNA_APORTES_TRF5_INTERNO = "APORTES - [TRF5]"
 COLUNA_APORTES_TRT6_INTERNO = "APORTES - [TRT6]"
 
-# Nomes de Colunas de Rateio Percentual (Atualizados para o padrão mais recente)
+# Nomes de Colunas de Rateio Percentual 
 COLUNA_PERCENTUAL_TJPE_INTERNO = "TJPE (%)"
 COLUNA_PERCENTUAL_TRF5_INTERNO = "TRF5 (%)"
 COLUNA_PERCENTUAL_TRT6_INTERNO = "TRT6 (%)"
 
-# NOVAS COLUNAS SOLICITADAS (em R$)
+# COLUNAS SOLICITADAS PARA A NOVA SEÇÃO DE KPI
+COLUNA_TJPE_SIMPLES_INTERNO = "TJPE"
+COLUNA_TRF5_SIMPLES_INTERNO = "TRF5"
+COLUNA_TRT6_SIMPLES_INTERNO = "TRT6"
+# (As colunas TJPE (R$), TRF5 (R$), TRT6 (R$) também são mapeadas, mas não usadas na nova seção)
 COLUNA_TJPE_RS_INTERNO = "TJPE (R$)"
 COLUNA_TRF5_RS_INTERNO = "TRF5 (R$)"
 COLUNA_TRT6_RS_INTERNO = "TRT6 (R$)"
+
 
 # Nomes de Display (Para manter o visual anterior consistente)
 COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY = "ENDIVIDAMENTO TOTAL EM JAN/2025" 
@@ -186,14 +191,15 @@ else:
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             df_float = df.copy() 
             
-            # LISTA ATUALIZADA com base nos nomes internos da planilha ATUALIZADA
+            # LISTA FINAL DE COLUNAS NUMÉRICAS
             colunas_para_float_final = [
                 COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, COLUNA_PARCELA_ANUAL_INTERNO, COLUNA_APORTES_INTERNO, "RCL 2024", 
                 "DÍVIDA EM MORA / RCL", "% APLICADO", 
                 COLUNA_SALDO_A_PAGAR_INTERNO, COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO,
                 # Colunas de Aportes/Endividamento/Rateio R$ por Tribunal
                 COLUNA_APORTES_TJPE_INTERNO, COLUNA_APORTES_TRF5_INTERNO, COLUNA_APORTES_TRT6_INTERNO, 
-                COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, 
+                COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, # R$ (mantidas no mapeamento)
+                COLUNA_TJPE_SIMPLES_INTERNO, COLUNA_TRF5_SIMPLES_INTERNO, COLUNA_TRT6_SIMPLES_INTERNO, # Simples (USADAS NO NOVO KPI)
                 "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
                 # Colunas de Estoque
                 "ESTOQUE EM MORA - [TJPE]", "ESTOQUE VINCENDOS - [TJPE]",
@@ -292,22 +298,22 @@ else:
                 
                 st.markdown("---") 
 
-                # --- NOVA SEÇÃO DE KPI SOLICITADA (RE-ADICIONADA) ---
+                # --- NOVA SEÇÃO DE KPI SOLICITADA (USANDO TJPE, TRF5, TRT6) ---
                 st.header("➡️ TOTAL A SER APORTADO PARA CADA TRIBUNAL")
                 
-                # Cálculo das somas dos novos KPIs (USANDO OS NOMES CORRETOS)
-                total_tjpe_rs = df_filtrado_calculo[COLUNA_TJPE_RS_INTERNO].sum()
-                total_trf5_rs = df_filtrado_calculo[COLUNA_TRF5_RS_INTERNO].sum()
-                total_trt6_rs = df_filtrado_calculo[COLUNA_TRT6_RS_INTERNO].sum()
+                # Cálculo das somas dos novos KPIs (USANDO OS NOMES CORRETOS: TJPE, TRF5, TRT6)
+                total_tjpe_simples = df_filtrado_calculo[COLUNA_TJPE_SIMPLES_INTERNO].sum()
+                total_trf5_simples = df_filtrado_calculo[COLUNA_TRF5_SIMPLES_INTERNO].sum()
+                total_trt6_simples = df_filtrado_calculo[COLUNA_TRT6_SIMPLES_INTERNO].sum()
 
                 col_tjpe, col_trf5, col_trt6 = st.columns(3)
 
                 with col_tjpe:
-                    st.metric(label="TJPE (R$)", value=converter_e_formatar(total_tjpe_rs, 'moeda'))
+                    st.metric(label="TJPE (R$)", value=converter_e_formatar(total_tjpe_simples, 'moeda'))
                 with col_trf5:
-                    st.metric(label="TRF5 (R$)", value=converter_e_formatar(total_trf5_rs, 'moeda'))
+                    st.metric(label="TRF5 (R$)", value=converter_e_formatar(total_trf5_simples, 'moeda'))
                 with col_trt6:
-                    st.metric(label="TRT6 (R$)", value=converter_e_formatar(total_trt6_rs, 'moeda'))
+                    st.metric(label="TRT6 (R$)", value=converter_e_formatar(total_trt6_simples, 'moeda'))
                 
                 st.markdown("---") 
 
