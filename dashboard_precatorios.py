@@ -7,17 +7,24 @@ import unicodedata
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
-# (ATUALIZADO PARA A NOVA PLANILHA)
+# (AJUSTADO PARA OS NOMES REAIS ENCONTRADOS NO CSV)
 # ----------------------------------------------------
 FILE_PATH = "Painel Entes.csv"
 
-# Nomes Internos (Baseados na nova planilha)
-COLUNA_PARCELA_ANUAL_INTERNO = "TOTAL A SER APORTADO"
-COLUNA_APORTES_INTERNO = "VALOR APORTADO"
-COLUNA_SALDO_A_PAGAR_INTERNO = "SALDO REMANESCENTE A APORTAR"
-COLUNA_TJPE_RS_INTERNO = "TJPE (R$)"
-COLUNA_TRF5_RS_INTERNO = "TRF5 (R$)"
-COLUNA_TRT6_RS_INTERNO = "TRT6 (R$)"
+# Nomes Internos (Baseados nos nomes que o CSV realmente tem)
+COLUNA_PARCELA_ANUAL_INTERNO = "PARCELA ANUAL"
+COLUNA_APORTES_INTERNO = "APORTES"
+COLUNA_SALDO_A_PAGAR_INTERNO = "SALDO A PAGAR"
+
+# Nomes de Colunas de Rateio por Tribunal (também ajustados)
+COLUNA_APORTES_TJPE_INTERNO = "APORTES - [TJPE]"
+COLUNA_APORTES_TRF5_INTERNO = "APORTES - [TRF5]"
+COLUNA_APORTES_TRT6_INTERNO = "APORTES - [TRT6]"
+
+COLUNA_PERCENTUAL_TJPE_INTERNO = "% TJPE"
+COLUNA_PERCENTUAL_TRF5_INTERNO = "% TRF5"
+COLUNA_PERCENTUAL_TRT6_INTERNO = "% TRT6"
+
 
 # Nomes de Display (Para manter o visual anterior)
 COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY = "ENDIVIDAMENTO TOTAL EM JAN/2025" 
@@ -162,8 +169,6 @@ else:
             df = df.iloc[:-1].copy()
 
             # --- RENOMEAR COLUNAS (PARA MANTER OS NOMES DE EXIBIÇÃO) ---
-            # O Endividamento Total não tem um nome único na nova planilha, 
-            # então remapeamos as colunas com base no prefixo para o nome de DISPLAY
             rename_map = {
                 "ENDIVIDAMENTO TOTAL": COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY,
                 "ENDIVIDAMENTO TOTAL - [TJPE]": "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]",
@@ -176,20 +181,19 @@ else:
             # --- Conversão para DataFrame de TRABALHO (df_float) ---
             df_float = df.copy() 
             
-            # LISTA ATUALIZADA: Incluindo todas as colunas numéricas da nova planilha
+            # LISTA ATUALIZADA com base nas colunas encontradas no seu CSV
             colunas_para_float_final = [
                 COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY, COLUNA_PARCELA_ANUAL_INTERNO, COLUNA_APORTES_INTERNO, "RCL 2024", 
                 "DÍVIDA EM MORA / RCL", "% APLICADO", 
-                COLUNA_SALDO_A_PAGAR_INTERNO, "TJPE (%)", "TRF5 (%)", "TRT6 (%)",
-                # Novas colunas de rateio em R$
-                COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, 
+                COLUNA_SALDO_A_PAGAR_INTERNO, COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO,
+                # Colunas de Aportes/Endividamento por Tribunal (novas)
+                COLUNA_APORTES_TJPE_INTERNO, COLUNA_APORTES_TRF5_INTERNO, COLUNA_APORTES_TRT6_INTERNO, 
+                "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
                 # Colunas de Estoque
                 "ESTOQUE EM MORA - [TJPE]", "ESTOQUE VINCENDOS - [TJPE]",
                 "ESTOQUE EM MORA - [TRF5]", "ESTOQUE VINCENDOS - [TRF5]",
                 "ESTOQUE EM MORA - [TRT6]", "ESTOQUE VINCENDOS - [TRT6]",
-                "ESTOQUE EM MORA", "ESTOQUE VINCENDOS",
-                # Colunas Totalizadas (com nomes antigos/novos)
-                "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
+                "ESTOQUE EM MORA", "ESTOQUE VINCENDOS"
             ]
             
             colunas_para_float_final = list(set([col for col in colunas_para_float_final if col in df_float.columns]))
@@ -246,13 +250,13 @@ else:
                 # --- Seção 1: Indicadores Chave (5 KPIs) ---
                 st.header("📈 Indicadores Consolidado (Total)")
                 
-                # USANDO OS NOMES INTERNOS ATUALIZADOS DA PLANILHA
+                # USANDO OS NOMES INTERNOS ATUALIZADOS QUE ESTÃO NA PLANILHA
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
                 total_aportes = df_filtrado_calculo[COLUNA_APORTES_INTERNO].sum()
                 saldo_a_pagar = df_filtrado_calculo[COLUNA_SALDO_A_PAGAR_INTERNO].sum()
                 num_entes = df_filtrado_calculo["ENTE"].nunique()
 
-                # LÓGICA DO NOVO KPI "STATUS"
+                # LÓGICA DO KPI "STATUS"
                 if selected_ente == "Todos":
                     status_display = "-"
                 elif num_entes == 1 and "STATUS" in df_filtrado_string.columns:
@@ -302,7 +306,7 @@ else:
                     
                     df_indices_styled = df_exibicao_final[[col for col in colunas_indices if col in df_exibicao_final.columns]].copy()
                     
-                    # Renomeia o TOTAL A SER APORTADO para o nome de display na tabela
+                    # Renomeia para o nome de display na tabela
                     df_indices_styled.rename(columns={COLUNA_PARCELA_ANUAL_INTERNO: "PARCELA ANUAL"}, inplace=True)
                     
                     # Formatação
@@ -319,20 +323,20 @@ else:
                 with tab2: # ABA APORTES DETALHADOS (Com Renomeação)
                     st.subheader("Valores Aportados por Tribunal")
                     
-                    # Usando nomes internos para referenciar o DF (TJPE (R$), TRF5 (R$), TRT6 (R$))
+                    # Usando nomes internos ATUAIS para referenciar o DF
                     colunas_aportes_original = [
                         "ENTE", 
-                        COLUNA_TJPE_RS_INTERNO, 
-                        COLUNA_TRF5_RS_INTERNO, 
-                        COLUNA_TRT6_RS_INTERNO,
-                        COLUNA_APORTES_INTERNO # Total (VALOR APORTADO)
+                        COLUNA_APORTES_TJPE_INTERNO, 
+                        COLUNA_APORTES_TRF5_INTERNO, 
+                        COLUNA_APORTES_TRT6_INTERNO,
+                        COLUNA_APORTES_INTERNO # Total (APORTES)
                     ]
                     
                     # Mapeamento para os nomes de exibição na tabela
                     colunas_renomeadas_aportes = {
-                        COLUNA_TJPE_RS_INTERNO: "TJPE", 
-                        COLUNA_TRF5_RS_INTERNO: "TRF5", 
-                        COLUNA_TRT6_RS_INTERNO: "TRT6",
+                        COLUNA_APORTES_TJPE_INTERNO: "TJPE", 
+                        COLUNA_APORTES_TRF5_INTERNO: "TRF5", 
+                        COLUNA_APORTES_TRT6_INTERNO: "TRT6",
                         COLUNA_APORTES_INTERNO: "TOTAL"
                     }
                     
@@ -353,13 +357,17 @@ else:
                 with tab3:
                     st.subheader("Percentuais de Rateio por Tribunal")
                     
-                    # Usando nomes internos para referenciar o DF (TJPE (%), TRF5 (%), TRT6 (%))
-                    colunas_rateio = ["ENTE", "TJPE (%)", "TRF5 (%)", "TRT6 (%)"]
+                    # Usando nomes internos ATUAIS para referenciar o DF
+                    colunas_rateio = ["ENTE", COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO]
                     
                     df_rateio_styled = df_exibicao_final[[col for col in colunas_rateio if col in df_exibicao_final.columns]].copy()
                     
-                    # Renomeia colunas para o display antigo
-                    df_rateio_styled.rename(columns={"TJPE (%)": "% TJPE", "TRF5 (%)": "% TRF5", "TRT6 (%)": "% TRT6"}, inplace=True)
+                    # Renomeia para o display antigo
+                    df_rateio_styled.rename(columns={
+                        COLUNA_PERCENTUAL_TJPE_INTERNO: "% TJPE", 
+                        COLUNA_PERCENTUAL_TRF5_INTERNO: "% TRF5", 
+                        COLUNA_PERCENTUAL_TRT6_INTERNO: "% TRT6"
+                    }, inplace=True)
 
                     for col in ["% TJPE", "% TRF5", "% TRT6"]:
                         if col in df_rateio_styled.columns:
@@ -370,7 +378,7 @@ else:
                 with tab4: 
                     st.subheader(COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY + " por Tribunal")
                     
-                    # Colunas do DF original (agora com os nomes atualizados)
+                    # Colunas do DF original (agora com os nomes atuais)
                     colunas_divida_original = [
                         "ENTE", 
                         "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", 
@@ -405,4 +413,4 @@ else:
                 
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
-            st.warning("Verifique se o seu CSV possui problemas de formatação que impedem a leitura robusta, como quebras de linha ou caracteres ilegais. As colunas críticas esperadas são: ENTE, STATUS, TOTAL A SER APORTADO, VALOR APORTADO e DÍVIDA EM MORA / RCL.")
+            st.warning("Verifique se o seu CSV possui problemas de formatação que impedem a leitura robusta, como quebras de linha ou caracteres ilegais. As colunas críticas esperadas são: ENTE, STATUS, PARCELA ANUAL, APORTES e DÍVIDA EM MORA / RCL.")
