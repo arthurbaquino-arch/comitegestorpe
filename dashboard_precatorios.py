@@ -151,7 +151,7 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 st.markdown("<h1 style='color: #000080;'>Comitê Gestor de Precatórios - PE</h1>", unsafe_allow_html=True)
 # SUBTÍTULO
 st.markdown("TJPE - TRF5 - TRT6")
-# TÍTULO SECUNDÁRIO (H2) - TÍTULO ATUALIZADO E COM O EMOJI 💰
+# TÍTULO SECUNDÁRIO (H2)
 st.markdown("<h2>💰 Painel de Rateio - 2025</h2>", unsafe_allow_html=True)
 st.markdown("---") 
 
@@ -257,8 +257,8 @@ else:
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
-                # --- Seção 1: Indicadores Chave (4 KPIs) ---
-                st.header("📈 Indicadores consolidado (total)") # Formatação solicitada
+                # --- Seção 1: Indicadores Chave (4 KPIs) - TÍTULO ATUALIZADO ---
+                st.header("📈 Dados consolidados dos tribunais : TJPE - TRF5 - TRT6")
                 
                 # USANDO OS NOMES INTERNOS CORRETOS DA PLANILHA
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
