@@ -258,7 +258,7 @@ else:
                     df_exibicao_final = df_filtrado_calculo 
 
                 # --- Seção 1: Indicadores Chave (4 KPIs) - TÍTULO ATUALIZADO ---
-                st.header("📈 Dados consolidados dos tribunais : TJPE - TRF5 - TRT6")
+                st.header("📈 Dados consolidados dos tribunais: TJPE - TRF5 - TRT6")
                 
                 # USANDO OS NOMES INTERNOS CORRETOS DA PLANILHA
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
