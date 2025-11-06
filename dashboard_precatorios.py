@@ -151,8 +151,8 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 st.markdown("<h1 style='color: #000080;'>Comitê Gestor de Precatórios - PE</h1>", unsafe_allow_html=True)
 # SUBTÍTULO
 st.markdown("TJPE - TRF5 - TRT6")
-# TÍTULO SECUNDÁRIO (H2)
-st.markdown("<h2>💰 Situação dos Entes Devedores no Contexto da EC 136/2025</h2>", unsafe_allow_html=True)
+# TÍTULO SECUNDÁRIO (H2) - TÍTULO ATUALIZADO A PEDIDO DO USUÁRIO
+st.markdown("<h2>Painel de Rateio - 2025</h2>", unsafe_allow_html=True)
 st.markdown("---") 
 
 # ----------------------------------------------------
@@ -264,7 +264,7 @@ else:
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
                 total_aportes = df_filtrado_calculo[COLUNA_APORTES_INTERNO].sum()
                 saldo_a_pagar = df_filtrado_calculo[COLUNA_SALDO_A_PAGAR_INTERNO].sum()
-                num_entes = df_filtrado_calculo["ENTE"].nunique() # Mantido para lógica de Status, mas o KPI foi removido
+                num_entes = df_filtrado_calculo["ENTE"].nunique() 
 
                 # LÓGICA DO KPI "STATUS"
                 if selected_ente == "Todos":
@@ -277,10 +277,8 @@ else:
                     status_display = "-"
 
 
-                # Ajuste para 4 colunas (Removendo "Total de Entes Selecionados")
+                # Ajuste para 4 colunas (Removido o KPI "Total de Entes Selecionados")
                 col_parcela_anual, col_aportes, col_saldo, col_status = st.columns(4)
-                
-                # *** O bloco 'with col_entes:' foi removido ***
                 
                 with col_parcela_anual:
                     # USANDO O NOME DE DISPLAY
