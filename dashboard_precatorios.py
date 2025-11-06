@@ -117,7 +117,7 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
         num_valor = float(valor)
     else:
         str_valor = str(valor).strip()
-        str_limpa = str_valor.replace('R$', '').replace('(', '').replace(')', '').replace('%', '').strip()
+        str_limpa = str_valor.replace('R$', '', regex=False).replace('(', '', regex=False).replace(')', '', regex=False).replace('%', '', regex=False).strip()
 
         try:
             # Conversão robusta de formato brasileiro para float
@@ -323,7 +323,7 @@ else:
                 st.header("🔎 Análise detalhada de índices e aportes") # Formatação solicitada
                 
                 tab1, tab2, tab3, tab4 = st.tabs([
-                    "📊 Índices Fiscais e RCL", 
+                    "📊 RCL e Aporte", # Título atualizado aqui
                     "📈 Aportes Detalhados",
                     "⚖️ Rateio por Tribunal",
                     "💰 Composição da Dívida"
