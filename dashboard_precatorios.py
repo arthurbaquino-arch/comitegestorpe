@@ -323,7 +323,7 @@ else:
                 st.header("🔎 Análise detalhada de índices e aportes") # Formatação solicitada
                 
                 tab1, tab2, tab3, tab4 = st.tabs([
-                    "📊 RCL e Aporte", # Título atualizado aqui
+                    "📊 RCL e Aporte", 
                     "📈 Aportes Detalhados",
                     "⚖️ Rateio por Tribunal",
                     "💰 Composição da Dívida"
@@ -388,25 +388,58 @@ else:
                     st.dataframe(df_aportes_styled, use_container_width=True, hide_index=True)
                 
                 with tab3:
-                    st.subheader("Percentuais de Rateio por Tribunal")
+                    st.subheader("Rateio por Tribunal: Visualização")
                     
-                    # Usando nomes internos ATUAIS para referenciar o DF
-                    colunas_rateio = ["ENTE", COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO]
+                    # Seletor para alternar entre % e R$
+                    rateio_view = st.radio(
+                        "Escolha a métrica:",
+                        ["Porcentual (%)", "Valor (R$)", ],
+                        key="rateio_view",
+                        horizontal=True
+                    )
                     
-                    df_rateio_styled = df_exibicao_final[[col for col in colunas_rateio if col in df_exibicao_final.columns]].copy()
-                    
-                    # Renomeia para o display antigo
-                    df_rateio_styled.rename(columns={
-                        COLUNA_PERCENTUAL_TJPE_INTERNO: "TJPE (%)", 
-                        COLUNA_PERCENTUAL_TRF5_INTERNO: "TRF5 (%)", 
-                        COLUNA_PERCENTUAL_TRT6_INTERNO: "TRT6 (%)"
-                    }, inplace=True)
-
-                    for col in ["TJPE (%)", "TRF5 (%)", "TRT6 (%)"]:
-                        if col in df_rateio_styled.columns:
-                            df_rateio_styled[col] = df_rateio_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
+                    if rateio_view == "Porcentual (%)":
+                        # --- Visualização por Porcentual (%) ---
                         
-                    st.dataframe(df_rateio_styled, use_container_width=True, hide_index=True)
+                        colunas_rateio = ["ENTE", COLUNA_PERCENTUAL_TJPE_INTERNO, COLUNA_PERCENTUAL_TRF5_INTERNO, COLUNA_PERCENTUAL_TRT6_INTERNO]
+                        df_rateio_styled = df_exibicao_final[[col for col in colunas_rateio if col in df_exibicao_final.columns]].copy()
+                        
+                        # Renomeia
+                        df_rateio_styled.rename(columns={
+                            COLUNA_PERCENTUAL_TJPE_INTERNO: "TJPE (%)", 
+                            COLUNA_PERCENTUAL_TRF5_INTERNO: "TRF5 (%)", 
+                            COLUNA_PERCENTUAL_TRT6_INTERNO: "TRT6 (%)"
+                        }, inplace=True)
+
+                        # Formatação
+                        for col in ["TJPE (%)", "TRF5 (%)", "TRT6 (%)"]:
+                            if col in df_rateio_styled.columns:
+                                df_rateio_styled[col] = df_rateio_styled[col].apply(lambda x: converter_e_formatar(x, 'percentual'))
+                                
+                        st.dataframe(df_rateio_styled, use_container_width=True, hide_index=True)
+
+                    elif rateio_view == "Valor (R$)":
+                        # --- Visualização por Valor (R$) ---
+                        
+                        # Usando os nomes internos TJPE, TRF5, TRT6 (que contêm o valor R$)
+                        colunas_rateio_rs = ["ENTE", COLUNA_TJPE_SIMPLES_INTERNO, COLUNA_TRF5_SIMPLES_INTERNO, COLUNA_TRT6_SIMPLES_INTERNO]
+                        df_rateio_rs_styled = df_exibicao_final[[col for col in colunas_rateio_rs if col in df_exibicao_final.columns]].copy()
+                        
+                        # Renomeia para o display de valor
+                        df_rateio_rs_styled.rename(columns={
+                            COLUNA_TJPE_SIMPLES_INTERNO: "TJPE (R$)", 
+                            COLUNA_TRF5_SIMPLES_INTERNO: "TRF5 (R$)", 
+                            COLUNA_TRT6_SIMPLES_INTERNO: "TRT6 (R$)"
+                        }, inplace=True)
+
+                        # Formatação
+                        colunas_moeda_rateio = ["TJPE (R$)", "TRF5 (R$)", "TRT6 (R$)"]
+                        for col in colunas_moeda_rateio:
+                            if col in df_rateio_rs_styled.columns:
+                                df_rateio_rs_styled[col] = df_rateio_rs_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
+                        
+                        st.dataframe(df_rateio_rs_styled, use_container_width=True, hide_index=True)
+
 
                 with tab4: 
                     st.subheader(COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY + " por Tribunal")
