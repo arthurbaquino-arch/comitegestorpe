@@ -199,7 +199,7 @@ else:
                 COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, # R$ 
                 COLUNA_TJPE_SIMPLES_INTERNO, COLUNA_TRF5_SIMPLES_INTERNO, COLUNA_TRT6_SIMPLES_INTERNO, # Simples
                 "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
-                # Colunas de Estoque
+                # Colunas de Estoque (Novas colunas para a tab4)
                 "ESTOQUE EM MORA - [TJPE]", "ESTOQUE VINCENDOS - [TJPE]",
                 "ESTOQUE EM MORA - [TRF5]", "ESTOQUE VINCENDOS - [TRF5]",
                 "ESTOQUE EM MORA - [TRT6]", "ESTOQUE VINCENDOS - [TRT6]",
@@ -442,33 +442,69 @@ else:
 
 
                 with tab4: 
-                    st.subheader(COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY + " por Tribunal")
+                    st.subheader("Composição da Dívida: Estoque por Tribunal")
                     
-                    # Colunas do DF original (agora com os nomes atuais)
-                    colunas_divida_original = [
-                        "ENTE", 
-                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", 
-                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", 
-                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]", 
-                        COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY # Total
-                    ]
+                    # Seletor para alternar entre Em Mora, Vincendos e Total
+                    divida_view = st.radio(
+                        "Escolha a situação do estoque:",
+                        ["Total", "Em Mora", "Vincendos"],
+                        key="divida_view",
+                        horizontal=True
+                    )
+
+                    # 1. Definição das colunas com base na seleção
+                    if divida_view == "Em Mora":
+                        colunas_originais = [
+                            "ENTE", 
+                            "ESTOQUE EM MORA - [TJPE]", 
+                            "ESTOQUE EM MORA - [TRF5]", 
+                            "ESTOQUE EM MORA - [TRT6]", 
+                            "ESTOQUE EM MORA" # Total
+                        ]
+                        colunas_display = {
+                            "ESTOQUE EM MORA - [TJPE]": "TJPE (Em Mora)", 
+                            "ESTOQUE EM MORA - [TRF5]": "TRF5 (Em Mora)", 
+                            "ESTOQUE EM MORA - [TRT6]": "TRT6 (Em Mora)", 
+                            "ESTOQUE EM MORA": "TOTAL EM MORA"
+                        }
+                    elif divida_view == "Vincendos":
+                        colunas_originais = [
+                            "ENTE", 
+                            "ESTOQUE VINCENDOS - [TJPE]", 
+                            "ESTOQUE VINCENDOS - [TRF5]", 
+                            "ESTOQUE VINCENDOS - [TRT6]", 
+                            "ESTOQUE VINCENDOS" # Total
+                        ]
+                        colunas_display = {
+                            "ESTOQUE VINCENDOS - [TJPE]": "TJPE (Vincendos)", 
+                            "ESTOQUE VINCENDOS - [TRF5]": "TRF5 (Vincendos)", 
+                            "ESTOQUE VINCENDOS - [TRT6]": "TRT6 (Vincendos)", 
+                            "ESTOQUE VINCENDOS": "TOTAL VINCENDOS"
+                        }
+                    else: # Default: Total (Endividamento Total)
+                        colunas_originais = [
+                            "ENTE", 
+                            "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", 
+                            "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", 
+                            "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]", 
+                            COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY # Total
+                        ]
+                        colunas_display = {
+                            "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]": "TJPE (Total)", 
+                            "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]": "TRF5 (Total)", 
+                            "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]": "TRT6 (Total)", 
+                            COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY: "TOTAL ENDIVIDAMENTO"
+                        }
+
+                    # 2. Processamento e estilização da tabela
+                    # Filtra apenas as colunas que existem no DataFrame
+                    df_divida_styled = df_exibicao_final[[col for col in colunas_originais if col in df_exibicao_final.columns]].copy()
                     
-                    # Mapeamento para os nomes de exibição na tabela
-                    colunas_renomeadas_divida = {
-                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]": "TJPE", 
-                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]": "TRF5", 
-                        "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]": "TRT6", 
-                        COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY: "TOTAL ENDIVIDAMENTO"
-                    }
+                    # Renomeia as colunas
+                    df_divida_styled.rename(columns=colunas_display, inplace=True)
                     
-                    # Cria a cópia para estilizar e renomear
-                    df_divida_styled = df_exibicao_final[[col for col in colunas_divida_original if col in df_exibicao_final.columns]].copy()
-                    
-                    # Renomeia as colunas apenas para exibição nesta aba
-                    df_divida_styled.rename(columns=colunas_renomeadas_divida, inplace=True)
-                    
-                    # Lista de colunas a serem formatadas em moeda (os novos nomes de exibição)
-                    colunas_moeda_divida = ["TJPE", "TRF5", "TRT6", "TOTAL ENDIVIDAMENTO"]
+                    # Colunas de valor a serem formatadas (excluindo 'ENTE')
+                    colunas_moeda_divida = [col for col in df_divida_styled.columns if col != "ENTE"]
 
                     # Formatação em moeda
                     for col in colunas_moeda_divida:
