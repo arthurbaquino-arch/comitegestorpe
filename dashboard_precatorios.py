@@ -149,7 +149,7 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
 # ----------------------------------------------------
 # TÍTULO PRINCIPAL (H1, com a cor AZUL MARINHO #000080)
 st.markdown("<h1 style='color: #000080;'>Comitê Gestor de Precatórios - PE</h1>", unsafe_allow_html=True)
-# SUBTÍTULO (Alteração: Usar H3 com a mesma cor do H1 e ajuste de margem)
+# SUBTÍTULO (Usando H3 com a mesma cor do H1 e ajuste de margem)
 st.markdown("<h3 style='color: #000080; margin-top: -15px;'>TJPE - TRF5 - TRT6</h3>", unsafe_allow_html=True) 
 # TÍTULO SECUNDÁRIO (H2)
 st.markdown("<h2>💰 Painel de Rateio - 2025</h2>", unsafe_allow_html=True)
@@ -219,22 +219,28 @@ else:
             df["ENTE"] = df["ENTE"].astype(str).str.strip() 
             df["STATUS"] = df["STATUS"].astype(str)
             
-            # --- Filtros (na Sidebar) ---
-            with st.sidebar:
-                st.header("⚙️ Filtros analíticos") # Formatação solicitada
-                
-                status_lista_limpa = df["STATUS"].dropna().unique().tolist()
-                status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
-                
-                # Extrai a lista de entes JÁ LIMPA para a ordenação correta
-                entes_lista = df["ENTE"].unique().tolist()
-                
-                # APLICAÇÃO DA CHAVE DE ORDENAÇÃO SEM ACENTOS
+            # --- Filtros (NO PAINEL PRINCIPAL) ---
+            st.header("⚙️ Filtros analíticos") # Formatação solicitada
+            
+            status_lista_limpa = df["STATUS"].dropna().unique().tolist()
+            status_lista = [s for s in status_lista_limpa if s.lower() != 'nan' and s is not np.nan]
+            
+            # Extrai a lista de entes JÁ LIMPA para a ordenação correta
+            entes_lista = df["ENTE"].unique().tolist()
+            
+            # Cria colunas para os filtros no corpo do app
+            col_filtro_ente, col_filtro_status = st.columns(2)
+            
+            with col_filtro_ente:
+                 # APLICAÇÃO DA CHAVE DE ORDENAÇÃO SEM ACENTOS
                 selected_ente = st.selectbox("👤 Ente Devedor:", 
                                              options=["Todos"] + sorted(entes_lista, key=sort_key_without_accents))
-                
+            
+            with col_filtro_status:
                 selected_status = st.selectbox("🚦 Status da Dívida:", options=["Todos"] + sorted(status_lista))
             
+            st.markdown("---") 
+
             # 4. Aplicação dos filtros
             filtro_entes = df["ENTE"] == selected_ente if selected_ente != "Todos" else df["ENTE"].notnull()
             filtro_status = df["STATUS"] == selected_status if selected_status != "Todos" else df["STATUS"].notnull()
@@ -248,7 +254,7 @@ else:
             # ----------------------------------------------------
             
             if df_filtrado_calculo.empty:
-                st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros na barra lateral.")
+                st.warning("Nenhum dado encontrado com os filtros selecionados. Ajuste os filtros.")
             else:
                 
                 # Ordena pelo DF de cálculo (float)
@@ -257,7 +263,7 @@ else:
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
-                # --- Seção 1: Indicadores Chave (4 KPIs) - TÍTULO ATUALIZADO ---
+                # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Dados consolidados dos tribunais: TJPE - TRF5 - TRT6")
                 
                 # USANDO OS NOMES INTERNOS CORRETOS DA PLANILHA
