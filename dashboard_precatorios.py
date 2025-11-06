@@ -7,7 +7,6 @@ import unicodedata
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
-# (FINAL: AJUSTADO PARA AS COLUNAS SIMPLES: TJPE, TRF5, TRT6)
 # ----------------------------------------------------
 FILE_PATH = "Painel Entes.csv"
 
@@ -30,7 +29,6 @@ COLUNA_PERCENTUAL_TRT6_INTERNO = "TRT6 (%)"
 COLUNA_TJPE_SIMPLES_INTERNO = "TJPE"
 COLUNA_TRF5_SIMPLES_INTERNO = "TRF5"
 COLUNA_TRT6_SIMPLES_INTERNO = "TRT6"
-# (As colunas TJPE (R$), TRF5 (R$), TRT6 (R$) também são mapeadas, mas não usadas na nova seção)
 COLUNA_TJPE_RS_INTERNO = "TJPE (R$)"
 COLUNA_TRF5_RS_INTERNO = "TRF5 (R$)"
 COLUNA_TRT6_RS_INTERNO = "TRT6 (R$)"
@@ -259,14 +257,14 @@ else:
                 else:
                     df_exibicao_final = df_filtrado_calculo 
 
-                # --- Seção 1: Indicadores Chave (5 KPIs) ---
+                # --- Seção 1: Indicadores Chave (4 KPIs) ---
                 st.header("📈 Indicadores consolidado (total)") # Formatação solicitada
                 
                 # USANDO OS NOMES INTERNOS CORRETOS DA PLANILHA
                 total_parcela_anual = df_filtrado_calculo[COLUNA_PARCELA_ANUAL_INTERNO].sum()
                 total_aportes = df_filtrado_calculo[COLUNA_APORTES_INTERNO].sum()
                 saldo_a_pagar = df_filtrado_calculo[COLUNA_SALDO_A_PAGAR_INTERNO].sum()
-                num_entes = df_filtrado_calculo["ENTE"].nunique()
+                num_entes = df_filtrado_calculo["ENTE"].nunique() # Mantido para lógica de Status, mas o KPI foi removido
 
                 # LÓGICA DO KPI "STATUS"
                 if selected_ente == "Todos":
@@ -279,11 +277,11 @@ else:
                     status_display = "-"
 
 
-                # Ajuste para 5 colunas
-                col_entes, col_parcela_anual, col_aportes, col_saldo, col_status = st.columns(5)
+                # Ajuste para 4 colunas (Removendo "Total de Entes Selecionados")
+                col_parcela_anual, col_aportes, col_saldo, col_status = st.columns(4)
                 
-                with col_entes:
-                    st.metric(label="Total de Entes Selecionados", value=f"{num_entes}")
+                # *** O bloco 'with col_entes:' foi removido ***
+                
                 with col_parcela_anual:
                     # USANDO O NOME DE DISPLAY
                     st.metric(label=COLUNA_PARCELA_ANUAL_DISPLAY, value=converter_e_formatar(total_parcela_anual, 'moeda'))
@@ -293,7 +291,7 @@ else:
                 with col_saldo:
                     # USANDO O NOME DE DISPLAY
                     st.metric(label=COLUNA_SALDO_A_PAGAR_DISPLAY, value=converter_e_formatar(saldo_a_pagar, 'moeda'))
-                with col_status: # NOVO KPI
+                with col_status: # KPI STATUS
                     st.metric(label="Status", value=status_display)
                 
                 st.markdown("---") 
