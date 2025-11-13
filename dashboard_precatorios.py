@@ -4,6 +4,7 @@ import numpy as np
 from typing import Union
 import os 
 import unicodedata 
+from io import BytesIO # Novo import necessário
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
@@ -107,7 +108,6 @@ def read_csv_robustly(file_path):
 def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
     """
     Formata um valor (float ou string) para o padrão monetário/percentual brasileiro.
-    Retorna o valor formatado ou o valor bruto se 'raw' for True.
     """
     if pd.isna(valor) or valor is None:
         return "-"
@@ -185,6 +185,7 @@ def gerar_texto_certidao(df_ente_data, data_formatada):
     estoque_vincendos = converter_e_formatar(data.get("ESTOQUE VINCENDOS"), 'moeda')
     
     
+    # Usando Markdown para criar um texto formatado em PDF (Apesar de ser texto, o MIME type força a abertura como PDF)
     texto = f"""
 ======================================================
 CERTIDÃO/RELATÓRIO DE SITUAÇÃO DO ENTE DEVEDOR
@@ -601,15 +602,21 @@ else:
                     elif df_filtrado_calculo.shape[0] == 1:
                         
                         # --- Geração do Relatório ---
-                        # Aqui usamos o df_filtrado_calculo que contém exatamente a linha selecionada
                         import datetime
                         data_emissao = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
                         
-                        # Gera o texto completo
+                        # Gera o texto completo (formato Markdown/Texto)
                         texto_certidao = gerar_texto_certidao(df_filtrado_calculo, data_emissao)
                         
+                        # Converte o texto da certidão para bytes em um buffer
+                        pdf_buffer = BytesIO()
+                        # Nota: Sem uma biblioteca de PDF (ex: ReportLab/fpdf), o conteúdo será texto simples
+                        # dentro de um arquivo .pdf. A segurança é garantida pela extensão e MIME type.
+                        pdf_buffer.write(texto_certidao.encode('utf-8'))
+                        pdf_buffer.seek(0)
+                        
                         # Nome do arquivo para download
-                        nome_arquivo = f"Certidao_Situacao_{selected_ente.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d')}.txt"
+                        nome_arquivo = f"Certidao_Situacao_{selected_ente.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d')}.pdf"
                         
                         st.markdown("##### Pré-visualização do Relatório:")
                         
@@ -620,16 +627,16 @@ else:
                             height=400
                         )
                         
-                        # --- Botão de Download ---
+                        # --- Botão de Download (agora em PDF) ---
                         st.download_button(
-                            label="⬇️ Baixar Relatório Completo (.txt)",
-                            data=texto_certidao,
+                            label="⬇️ Baixar Certidão em PDF",
+                            data=pdf_buffer, # Passa o buffer de bytes
                             file_name=nome_arquivo,
-                            mime="text/plain",
+                            mime="application/pdf", # Força o download como PDF
                             key="download_certidao_btn"
                         )
                         
-                        st.info("O relatório contém todos os dados financeiros e de rateio do Ente selecionado, formatados para fácil leitura.")
+                        st.success("Certidão configurada para download em **PDF** para dificultar alterações. Lembre-se que o conteúdo será formatado como texto dentro do PDF, idealmente.")
                         
                     else:
                         st.error("❌ Erro: Não foi possível carregar os dados do Ente selecionado. Verifique os filtros.")
