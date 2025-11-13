@@ -4,7 +4,6 @@ import numpy as np
 from typing import Union
 import os 
 import unicodedata 
-from io import BytesIO # Mantido apenas se necessário para outras partes, mas ignorado no download
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
@@ -138,88 +137,12 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
             # Formatação percentual
             return f"{num_valor:,.2f}%".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
         
-        elif formato == 'raw_float':
-            # Retorna o float limpo
-            return num_valor
-        
         else:
             return str(num_valor)
             
     except Exception:
         return "-"
 
-# ----------------------------------------------------
-# FUNÇÃO: GERAÇÃO DO TEXTO DA CERTIDÃO (RETORNA STRING)
-# ----------------------------------------------------
-def gerar_texto_certidao(df_ente_data, data_formatada):
-    """
-    Gera o texto completo da certidão a partir de uma linha (Série) do DataFrame.
-    """
-    if df_ente_data.empty:
-        return "Nenhum ente selecionado ou dados indisponíveis para emissão de certidão."
-        
-    # Transforma o DataFrame de uma linha em uma Série (Para facilitar o acesso aos dados)
-    data = df_ente_data.iloc[0]
-
-    # Formatação de campos específicos (usando a função de conversão)
-    rcl = converter_e_formatar(data.get("RCL 2024"), 'moeda')
-    divida_mora_rcl = converter_e_formatar(data.get("DÍVIDA EM MORA / RCL"), 'percentual')
-    parcela_anual = converter_e_formatar(data.get(COLUNA_PARCELA_ANUAL_INTERNO), 'moeda')
-    valor_aportado = converter_e_formatar(data.get(COLUNA_APORTES_INTERNO), 'moeda')
-    saldo_a_aportar = converter_e_formatar(data.get(COLUNA_SALDO_A_PAGAR_INTERNO), 'moeda')
-    
-    # Rateios
-    tjpe_perc = converter_e_formatar(data.get(COLUNA_PERCENTUAL_TJPE_INTERNO), 'percentual')
-    trf5_perc = converter_e_formatar(data.get(COLUNA_PERCENTUAL_TRF5_INTERNO), 'percentual')
-    trt6_perc = converter_e_formatar(data.get(COLUNA_PERCENTUAL_TRT6_INTERNO), 'percentual')
-    
-    tjpe_rs = converter_e_formatar(data.get(COLUNA_TJPE_SIMPLES_INTERNO), 'moeda')
-    trf5_rs = converter_e_formatar(data.get(COLUNA_TRF5_SIMPLES_INTERNO), 'moeda')
-    trt6_rs = converter_e_formatar(data.get(COLUNA_TRT6_SIMPLES_INTERNO), 'moeda')
-    
-    # Endividamento Total
-    endividamento_total = converter_e_formatar(data.get(COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY), 'moeda')
-    
-    # Estoque
-    estoque_mora = converter_e_formatar(data.get("ESTOQUE EM MORA"), 'moeda')
-    estoque_vincendos = converter_e_formatar(data.get("ESTOQUE VINCENDOS"), 'moeda')
-    
-    
-    texto = f"""
-======================================================
-CERTIDÃO/RELATÓRIO DE SITUAÇÃO DO ENTE DEVEDOR
-COMITÊ GESTOR DE PRECATÓRIOS - TJPE - TRF5 - TRT6
-DATA DA EMISSÃO: {data_formatada}
-======================================================
-
-1. INFORMAÇÕES BÁSICAS
-------------------------------------------------------
-ENTE DEVEDOR: {data.get('ENTE', 'N/A')}
-STATUS DA DÍVIDA: {data.get('STATUS', 'N/A')}
-RCL 2024: {rcl}
-
-2. SITUAÇÃO DO APORTE (EC 136/2025)
-------------------------------------------------------
-TOTAL A SER APORTADO (R$): {parcela_anual}
-VALOR JÁ APORTADO (R$): {valor_aportado}
-SALDO REMANESCENTE A APORTAR (R$): {saldo_a_aportar}
-
-3. ENDIVIDAMENTO E ÍNDICES
-------------------------------------------------------
-ENDIVIDAMENTO TOTAL EM JAN/2025 (R$): {endividamento_total}
-DÍVIDA EM MORA / RCL: {divida_mora_rcl}
-ESTOQUE EM MORA (R$): {estoque_mora}
-ESTOQUE VINCENDOS (R$): {estoque_vincendos}
-
-4. RATEIO 2025 POR TRIBUNAL
-------------------------------------------------------
-Rateio TJPE: {tjpe_rs} ({tjpe_perc})
-Rateio TRF5: {trf5_rs} ({trf5_perc})
-Rateio TRT6: {trt6_rs} ({trt6_perc})
-
-======================================================
-"""
-    return texto
 
 # ----------------------------------------------------
 # TÍTULOS E LAYOUT INICIAL
@@ -276,7 +199,7 @@ else:
                 COLUNA_TJPE_RS_INTERNO, COLUNA_TRF5_RS_INTERNO, COLUNA_TRT6_RS_INTERNO, # R$ 
                 COLUNA_TJPE_SIMPLES_INTERNO, COLUNA_TRF5_SIMPLES_INTERNO, COLUNA_TRT6_SIMPLES_INTERNO, # Simples
                 "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TJPE]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRF5]", "ENDIVIDAMENTO TOTAL EM JAN/2025 - [TRT6]",
-                # Colunas de Estoque
+                # Colunas de Estoque (Novas colunas para a tab4)
                 "ESTOQUE EM MORA - [TJPE]", "ESTOQUE VINCENDOS - [TJPE]",
                 "ESTOQUE EM MORA - [TRF5]", "ESTOQUE VINCENDOS - [TRF5]",
                 "ESTOQUE EM MORA - [TRT6]", "ESTOQUE VINCENDOS - [TRT6]",
@@ -397,15 +320,13 @@ else:
                 st.markdown("---") 
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
-                # Aumentei para 5 abas, incluindo a Certidão
                 st.header("🔎 Análise detalhada de índices e aportes") # Formatação solicitada
                 
-                tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                tab1, tab2, tab3, tab4 = st.tabs([
                     "📊 RCL e Aporte", 
                     "📈 Aportes Detalhados",
                     "⚖️ Rateio por Tribunal",
-                    "💰 Composição da Dívida",
-                    "📄 Certidão/Relatório" # NOVA ABA
+                    "💰 Composição da Dívida"
                 ])
                 
                 with tab1:
@@ -591,48 +512,7 @@ else:
                              df_divida_styled[col] = df_divida_styled[col].apply(lambda x: converter_e_formatar(x, 'moeda'))
 
                     st.dataframe(df_divida_styled, use_container_width=True, hide_index=True)
-                    
                 
-                with tab5: # ABA: CERTIDÃO/RELATÓRIO - AGORA EM .TXT
-                    st.subheader("Emissão de Relatório do Ente Selecionado")
-                    
-                    if selected_ente == "Todos":
-                        st.warning("⚠️ **Atenção:** Selecione um único Ente Devedor no filtro acima (👤 Ente Devedor) para emitir a Certidão.")
-                    elif df_filtrado_calculo.shape[0] == 1:
-                        
-                        # --- Geração do Relatório ---
-                        import datetime
-                        data_emissao = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
-                        
-                        # Gera o texto completo (formato Markdown/Texto)
-                        texto_certidao = gerar_texto_certidao(df_filtrado_calculo, data_emissao)
-                        
-                        # Nome do arquivo para download (agora .txt)
-                        nome_arquivo = f"Certidao_Situacao_{selected_ente.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d')}.txt"
-                        
-                        st.markdown("##### Pré-visualização do Relatório:")
-                        
-                        # Exibe o texto em um bloco de código/área de texto
-                        st.text_area(
-                            "Conteúdo do Relatório",
-                            texto_certidao,
-                            height=400
-                        )
-                        
-                        # --- Botão de Download (de volta para .TXT) ---
-                        st.download_button(
-                            label="⬇️ Baixar Relatório Completo (.txt)",
-                            data=texto_certidao,
-                            file_name=nome_arquivo,
-                            mime="text/plain", # Tipo MIME para texto simples
-                            key="download_certidao_btn"
-                        )
-                        
-                        st.info("O download agora é feito em formato **.TXT** (texto simples). Lembre-se que este formato é facilmente editável.")
-                        
-                    else:
-                        st.error("❌ Erro: Não foi possível carregar os dados do Ente selecionado. Verifique os filtros.")
-
         except Exception as e:
             # Mantém a mensagem de erro robusta em caso de falha de leitura (por segurança)
             st.error(f"❌ Ocorreu um erro inesperado durante o processamento. Detalhes: {e}")
