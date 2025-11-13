@@ -4,7 +4,7 @@ import numpy as np
 from typing import Union
 import os 
 import unicodedata 
-from io import BytesIO # Novo import necessário
+from io import BytesIO # Mantido apenas se necessário para outras partes, mas ignorado no download
 
 # ----------------------------------------------------
 # CONFIGURAÇÃO DO ARQUIVO FIXO E MAPEAMENTO DE NOMES
@@ -149,7 +149,7 @@ def converter_e_formatar(valor: Union[str, float, int, None], formato: str):
         return "-"
 
 # ----------------------------------------------------
-# NOVA FUNÇÃO: GERAÇÃO DO TEXTO DA CERTIDÃO
+# FUNÇÃO: GERAÇÃO DO TEXTO DA CERTIDÃO (RETORNA STRING)
 # ----------------------------------------------------
 def gerar_texto_certidao(df_ente_data, data_formatada):
     """
@@ -185,7 +185,6 @@ def gerar_texto_certidao(df_ente_data, data_formatada):
     estoque_vincendos = converter_e_formatar(data.get("ESTOQUE VINCENDOS"), 'moeda')
     
     
-    # Usando Markdown para criar um texto formatado em PDF (Apesar de ser texto, o MIME type força a abertura como PDF)
     texto = f"""
 ======================================================
 CERTIDÃO/RELATÓRIO DE SITUAÇÃO DO ENTE DEVEDOR
@@ -594,7 +593,7 @@ else:
                     st.dataframe(df_divida_styled, use_container_width=True, hide_index=True)
                     
                 
-                with tab5: # NOVA ABA: CERTIDÃO/RELATÓRIO
+                with tab5: # ABA: CERTIDÃO/RELATÓRIO - AGORA EM .TXT
                     st.subheader("Emissão de Relatório do Ente Selecionado")
                     
                     if selected_ente == "Todos":
@@ -608,15 +607,8 @@ else:
                         # Gera o texto completo (formato Markdown/Texto)
                         texto_certidao = gerar_texto_certidao(df_filtrado_calculo, data_emissao)
                         
-                        # Converte o texto da certidão para bytes em um buffer
-                        pdf_buffer = BytesIO()
-                        # Nota: Sem uma biblioteca de PDF (ex: ReportLab/fpdf), o conteúdo será texto simples
-                        # dentro de um arquivo .pdf. A segurança é garantida pela extensão e MIME type.
-                        pdf_buffer.write(texto_certidao.encode('utf-8'))
-                        pdf_buffer.seek(0)
-                        
-                        # Nome do arquivo para download
-                        nome_arquivo = f"Certidao_Situacao_{selected_ente.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d')}.pdf"
+                        # Nome do arquivo para download (agora .txt)
+                        nome_arquivo = f"Certidao_Situacao_{selected_ente.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d')}.txt"
                         
                         st.markdown("##### Pré-visualização do Relatório:")
                         
@@ -627,16 +619,16 @@ else:
                             height=400
                         )
                         
-                        # --- Botão de Download (agora em PDF) ---
+                        # --- Botão de Download (de volta para .TXT) ---
                         st.download_button(
-                            label="⬇️ Baixar Certidão em PDF",
-                            data=pdf_buffer, # Passa o buffer de bytes
+                            label="⬇️ Baixar Relatório Completo (.txt)",
+                            data=texto_certidao,
                             file_name=nome_arquivo,
-                            mime="application/pdf", # Força o download como PDF
+                            mime="text/plain", # Tipo MIME para texto simples
                             key="download_certidao_btn"
                         )
                         
-                        st.success("Certidão configurada para download em **PDF** para dificultar alterações. Lembre-se que o conteúdo será formatado como texto dentro do PDF, idealmente.")
+                        st.info("O download agora é feito em formato **.TXT** (texto simples). Lembre-se que este formato é facilmente editável.")
                         
                     else:
                         st.error("❌ Erro: Não foi possível carregar os dados do Ente selecionado. Verifique os filtros.")
