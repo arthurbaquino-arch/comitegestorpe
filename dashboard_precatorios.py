@@ -176,6 +176,16 @@ else:
             # --- REMOVER A ÚLTIMA LINHA (TOTALIZAÇÃO) ---
             df = df.iloc[:-1].copy()
 
+            # >>> NOVO PASSO: LIMPEZA E TRATAMENTO DE VALORES NULOS/INVALIDOS EM 'ENTE' <<<
+            df["ENTE"] = df["ENTE"].astype(str).str.strip()
+            # 1. Remove linhas onde ENTE é uma string vazia (resultante do strip)
+            df = df[df["ENTE"] != '']
+            # 2. Remove linhas onde ENTE é a string 'nan' (resultado de um NaN real no arquivo após a conversão para string)
+            df = df[df["ENTE"].str.lower() != 'nan']
+            # Remove linhas onde ENTE é nulo de fato (embora o astype(str) já converta para 'nan')
+            df.dropna(subset=['ENTE'], inplace=True) 
+            # Fim da limpeza
+            
             # --- RENOMEAR COLUNAS (PARA MANTER OS NOMES DE EXIBIÇÃO) ---
             rename_map = {
                 "ENDIVIDAMENTO TOTAL": COLUNA_ENDIVIDAMENTO_TOTAL_DISPLAY,
@@ -215,8 +225,7 @@ else:
                  df_float[col] = pd.to_numeric(str_limpa, errors='coerce')
 
 
-            # Garante que as colunas de ENTE e STATUS sejam strings e aplica limpeza
-            df["ENTE"] = df["ENTE"].astype(str).str.strip()
+            # Garante que as colunas de STATUS sejam strings e aplica limpeza
             df["STATUS"] = df["STATUS"].astype(str)
             
             # --- Filtros (NO PAINEL PRINCIPAL) ---
@@ -301,7 +310,7 @@ else:
                 st.markdown("---")
 
                 # --- NOVA SEÇÃO DE KPI SOLICITADA (USANDO TJPE, TRF5, TRT6) ---
-                # >>> TÍTULO ALTERADO COM ASTERISCO <<<
+                # TÍTULO ALTERADO COM ASTERISCO
                 st.header("➡️ Total a ser aportado para cada tribunal *") 
                 
                 # Cálculo das somas dos novos KPIs (USANDO OS NOMES CORRETOS: TJPE, TRF5, TRT6)
@@ -318,7 +327,7 @@ else:
                 with col_trt6:
                     st.metric(label="TRT6 (R$)", value=converter_e_formatar(total_trt6_simples, 'moeda'))
                 
-                # >>> NOTA DE RODAPÉ ATUALIZADA (ITÁLICO E SEM QUEBRA DE LINHA) <<<
+                # NOTA DE RODAPÉ ATUALIZADA (ITÁLICO E EM UMA LINHA)
                 st.markdown("*_Caso o valor da dívida seja inferior ao percentual aplicado sobre a Receita Corrente Líquida (RCL), o ente poderá regularizar sua situação mediante a quitação integral do débito, atualizado até a data do pagamento. Para esclarecimentos adicionais ou informações específicas sobre cada caso, recomenda-se entrar em contato diretamente com o tribunal responsável pela dívida._*")
                 
                 st.markdown("---")
