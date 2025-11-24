@@ -301,7 +301,8 @@ else:
                 st.markdown("---")
 
                 # --- NOVA SEÇÃO DE KPI SOLICITADA (USANDO TJPE, TRF5, TRT6) ---
-                st.header("➡️ Total a ser aportado para cada tribunal") # Formatação solicitada
+                # >>> TÍTULO ALTERADO COM ASTERISCO <<<
+                st.header("➡️ Total a ser aportado para cada tribunal *") 
                 
                 # Cálculo das somas dos novos KPIs (USANDO OS NOMES CORRETOS: TJPE, TRF5, TRT6)
                 total_tjpe_simples = df_filtrado_calculo[COLUNA_TJPE_SIMPLES_INTERNO].sum()
@@ -318,6 +319,13 @@ else:
                     st.metric(label="TRT6 (R$)", value=converter_e_formatar(total_trt6_simples, 'moeda'))
                 
                 st.markdown("---")
+                
+                # >>> NOTA DE RODAPÉ ADICIONADA <<<
+                st.markdown("""
+                <p style='font-size: 0.8em; line-height: 1.4;'>* Caso o valor da dívida seja inferior ao percentual aplicado sobre a Receita Corrente Líquida (RCL), o ente poderá regularizar sua situação mediante a quitação integral do débito, atualizado até a data do pagamento. Para esclarecimentos adicionais ou informações específicas sobre cada caso, recomenda-se entrar em contato diretamente com o tribunal responsável pela dívida.</p>
+                """, unsafe_allow_html=True)
+                st.markdown("---")
+
 
                 # --- Seção 3: Detalhes Técnicos (Quatro Abas) ---
                 st.header("🔎 Análise detalhada de índices e aportes") # Formatação solicitada
